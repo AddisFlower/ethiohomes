@@ -1,65 +1,114 @@
-import Image from "next/image";
+"use client";
+
+import { properties } from "@/data/properties";
+import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const router = useRouter();
+  const filteredProperties = properties.filter((property) =>
+    property.location.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-screen bg-gray-100">
+      {/* HERO SECTION */}
+      <section className="bg-gradient-to-r from-black to-gray-900 text-white py-24 px-6">
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-5xl font-bold mb-4">
+            Find Your Dream Home in Ethiopia
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+
+          <p className="text-xl text-gray-300 mb-8">
+            Discover apartments, villas, and investment properties across
+            Ethiopia.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+
+              router.push(
+                `/listings?search=${encodeURIComponent(searchTerm)}`
+              );
+            }}
+            className="flex gap-4 flex-wrap"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            <input
+              type="text"
+              placeholder="Search by city or neighborhood..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-white text-black px-4 py-3 rounded-lg w-full md:w-96"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+            <button
+              className="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg font-semibold"
+            >
+              Search
+            </button>
+          </form>
         </div>
-      </main>
-    </div>
+      </section>
+
+      {/* PROPERTY SECTION */}
+      <section className="max-w-6xl mx-auto py-16 px-6">
+        <h2 className="text-3xl font-bold mb-8 text-black">
+          Featured Properties
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {properties.map((property) => (
+            <div
+              key={property.id}
+              className="bg-white rounded-xl overflow-hidden shadow-lg hover:scale-105 transition duration-300"
+            >
+              <img
+                src={property.image}
+                alt={property.title}
+                className="h-56 w-full object-cover"
+              />
+
+              <div className="p-5">
+                <div className="flex gap-2 mb-3">
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                      property.status === "FOR SALE"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-blue-100 text-blue-700"
+                    }`}
+                  >
+                    {property.status}
+                  </span>
+
+                  {property.verified && (
+                    <span className="bg-black text-white px-3 py-1 rounded-full text-sm font-semibold">
+                      VERIFIED
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-2xl font-semibold text-black mb-2">
+                  {property.title}
+                </h3>
+
+                <p className="text-green-700 font-bold text-lg mb-2">
+                  {property.price}
+                </p>
+
+                <p className="text-gray-600 mb-4">{property.location}</p>
+
+                <Link href={`/listings/${property.id}`}>
+                  <button className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 cursor-pointer">
+                    View Details
+                  </button>
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </main>
   );
 }
