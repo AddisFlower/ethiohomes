@@ -15,48 +15,109 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-100">
       {/* HERO SECTION */}
-      <section className="bg-gradient-to-r from-black to-gray-900 text-white py-24 px-6">
+      <section className="bg-gradient-to-r from-slate-900 to-black text-white py-15 px-6">
         <div className="max-w-6xl mx-auto">
-          <h1 className="text-5xl font-bold mb-4">
-            Find Your Dream Home in Ethiopia
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            Modern Tools for Ethiopian Real Estate
           </h1>
 
-          <p className="text-xl text-gray-300 mb-8">
-            Discover apartments, villas, and investment properties across
-            Ethiopia.
+          <p className="text-lg text-gray-500 max-w-2xl mb-6">
+            Manage listings, clients, and property activity with EthioMLS.
           </p>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
+          <form>
+            <div className="flex flex-col md:flex-row gap-4">
+              <input
+                type="text"
+                placeholder="Search by city, neighborhood, or title..."
+                className="flex-1 px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700"
+              />
 
-              router.push(
-                `/listings?search=${encodeURIComponent(searchTerm)}`
-              );
-            }}
-            className="flex gap-4 flex-wrap"
-          >
-            <input
-              type="text"
-              placeholder="Search by city or neighborhood..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-white text-black px-4 py-3 rounded-lg w-full md:w-96"
-            />
+              <select className="px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700">
+                <option className="bg-white text-black">All Listings</option>
+                <option className="bg-white text-black">
+                  Residential Sale
+                </option>
+                <option className="bg-white text-black">
+                  Residential Rent
+                </option>
+                <option className="bg-white text-black">Multi-Family</option>
+                <option className="bg-white text-black">Land</option>
+                <option className="bg-white text-black">Commercial Sale</option>
+                <option className="bg-white text-black">Commercial Rent</option>
+              </select>
 
-            <button
-              className="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg font-semibold"
-            >
-              Search
-            </button>
+              <select className="px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700">
+                <option className="bg-white text-black">
+                  All Property Types
+                </option>
+                <option className="bg-white text-black">Apartment</option>
+                <option className="bg-white text-black">Villa</option>
+                <option className="bg-white text-black">Condo</option>
+                <option className="bg-white text-black">Office</option>
+                <option className="bg-white text-black">Land</option>
+              </select>
+
+              <button
+                type="submit"
+                className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-3 rounded-lg transition"
+              >
+                Search
+              </button>
+            </div>
           </form>
+        </div>
+      </section>
+
+      {/* AGENT WORKSPACE */}
+      <section className="max-w-6xl mx-auto py-12 px-6">
+        <h2 className="text-3xl font-bold text-black mb-2">Agent Workspace</h2>
+
+        <p className="text-gray-600 mb-8">
+          Quick overview of your listings, clients, and daily activity.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-emerald-700">
+            <h3 className="text-xl font-bold text-black mb-2">
+              Recent Listings
+            </h3>
+            <p className="text-3xl font-bold text-emerald-700 mb-3">12</p>
+            <p className="text-gray-600">Active listings currently managed.</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
+            <h3 className="text-xl font-bold text-black mb-2">
+              Client Inquiries
+            </h3>
+            <p className="text-3xl font-bold text-yellow-600 mb-3">5</p>
+            <p className="text-gray-600">New inquiries waiting for response.</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-600">
+            <h3 className="text-xl font-bold text-black mb-2">
+              Pending Approvals
+            </h3>
+            <p className="text-3xl font-bold text-red-600 mb-3">2</p>
+            <p className="text-gray-600">
+              Listings awaiting admin verification.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-emerald-700">
+            <h3 className="text-xl font-bold text-black mb-2">
+              Upcoming Showings
+            </h3>
+            <p className="text-3xl font-bold text-emerald-700 mb-3">3</p>
+            <p className="text-gray-600">Scheduled property tours this week.</p>
+          </div>
         </div>
       </section>
 
       {/* PROPERTY SECTION */}
       <section className="max-w-6xl mx-auto py-16 px-6">
         <h2 className="text-3xl font-bold mb-8 text-black">
-          Featured Properties
+          Promoted Listings
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -99,6 +160,27 @@ export default function Home() {
 
                 <p className="text-gray-600 mb-4">{property.location}</p>
 
+                <div className="mt-4 space-y-1 text-sm text-gray-600">
+                  <p>
+                    <span className="font-semibold text-black">
+                      Listing ID:
+                    </span>{" "}
+                    {property.listingId}
+                  </p>
+
+                  <p>
+                    <span className="font-semibold text-black">Agent:</span>{" "}
+                    {property.agent}
+                  </p>
+
+                  <p>
+                    <span className="font-semibold text-black">Status:</span>{" "}
+                    {property.approvalStatus}
+                  </p>
+
+                  <p className="text-xs text-gray-500">{property.updatedAt}</p>
+                </div>
+                
                 <Link href={`/listings/${property.id}`}>
                   <button className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 cursor-pointer">
                     View Details
