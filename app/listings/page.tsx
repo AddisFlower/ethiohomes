@@ -6,6 +6,11 @@ import { useSearchParams } from "next/navigation";
 import { properties } from "@/data/properties";
 
 function ListingsContent() {
+
+  
+  // TODO: Replace this mock agent ID with the authenticated user's ID
+  // once login/auth is implemented.
+  const currentAgentId = "agent-1";
   const [searchTerm, setSearchTerm] = useState("");
   const [listingStatus, setListingStatus] = useState("ALL");
   const [propertyType, setPropertyType] = useState("ALL");
@@ -77,7 +82,10 @@ function ListingsContent() {
         </select>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {filteredProperties.map((property) => (
+        {filteredProperties.map((property) => {
+          const isOwner = property.ownerId === currentAgentId;
+
+          return (
             <div
               key={property.id}
               className="bg-white rounded-xl overflow-hidden shadow-lg hover:scale-105 transition duration-300"
@@ -99,14 +107,43 @@ function ListingsContent() {
 
                 <p className="text-gray-600 mb-4">{property.location}</p>
 
-                <Link href={`/listings/${property.id}`}>
-                  <button className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 cursor-pointer">
-                    View Details
-                  </button>
-                </Link>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
+                    {property.status}
+                  </span>
+
+                  <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">
+                    {property.approvalStatus}
+                  </span>
+
+                  {isOwner && (
+                    <span className="bg-black text-white px-3 py-1 rounded-full text-xs font-semibold">
+                      OWNED BY YOU
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <Link href={`/listings/${property.id}`}>
+                    <button className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3 rounded-lg cursor-pointer transition">
+                      View Details
+                    </button>
+                  </Link>
+
+                  {isOwner ? (
+                    <button className="w-full border border-gray-300 hover:border-emerald-700 hover:text-emerald-700 text-black py-3 rounded-lg transition">
+                      Edit Listing
+                    </button>
+                  ) : (
+                    <button className="w-full border border-gray-300 hover:border-emerald-700 hover:text-emerald-700 text-black py-3 rounded-lg transition">
+                      Request Showing
+                    </button>
+                  )}
+              </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </main>
