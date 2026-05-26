@@ -1,4 +1,5 @@
 import { properties } from "@/data/properties";
+import Link from "next/link";
 
 export default async function PropertyDetails({
   params,
@@ -119,9 +120,11 @@ export default async function PropertyDetails({
         <div className="flex flex-wrap gap-4">
           {isOwner ? (
             <>
-              <button className="bg-emerald-700 hover:bg-emerald-800 text-white px-8 py-4 rounded-xl text-lg font-semibold transition">
-                Edit Listing
-              </button>
+              <Link href={`/listings/${property.id}/edit`}>
+                <button className="bg-emerald-700 hover:bg-emerald-800 text-white px-8 py-4 rounded-xl text-lg font-semibold transition">
+                  Edit Listing
+                </button>
+              </Link>
 
               <button className="border border-gray-300 hover:border-emerald-700 hover:text-emerald-700 text-black px-8 py-4 rounded-xl text-lg font-semibold transition">
                 Manage Photos

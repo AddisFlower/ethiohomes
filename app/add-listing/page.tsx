@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import PropertyForm from "@/components/PropertyForm";
 
 
 export default function AddListingPage() {
@@ -22,153 +24,22 @@ export default function AddListingPage() {
               
               {/* Later this will route to /my-listings 
                   and show only listings owned by the current agent */}
-              <a
+              <Link
                 href="/listings"
                 className="inline-block bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg font-semibold transition"
               >
                 View My Listings
-              </a>
+              </Link>
             </div>
           )}
 
-          <form
-            className="space-y-6"
+          <PropertyForm
+            mode="create"
             onSubmit={(e) => {
               e.preventDefault();
               setSubmitted(true);
             }}
-          >
-            <div>
-              <label className="block text-black font-semibold mb-2">
-                Property Title
-              </label>
-  
-              <input
-                type="text"
-                required
-                placeholder="Modern Apartment in Bole"
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
-              />
-            </div>
-  
-            <div>
-              <label className="block text-black font-semibold mb-2">
-                Price (ETB)
-              </label>
-  
-              <input
-                type="number"
-                placeholder="12000000"
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
-                required
-                min={1}
-              />
-            </div>
-  
-            <div>
-              <label className="block text-black font-semibold mb-2">
-                City
-              </label>
-  
-              <select required className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black">
-                <option>Addis Ababa</option>
-                <option>Adama</option>
-                <option>Hawassa</option>
-                <option>Bahir Dar</option>
-              </select>
-            </div>
-  
-            <div>
-              <label className="block text-black font-semibold mb-2">
-                Property Type
-              </label>
-  
-              <select className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black">
-                <option>Apartment</option>
-                <option>Villa</option>
-                <option>Land</option>
-                <option>Commercial</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-black font-semibold mb-2">
-                Listing Type
-              </label>
-
-              <select required className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black">
-                <option>FOR SALE</option>
-                <option>FOR RENT</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-black font-semibold mb-2">
-                  Bedrooms
-                </label>
-
-                <input
-                  type="number"
-                  placeholder="3"
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-black"
-                  required
-                  min={1}
-                />
-              </div>
-
-              <div>
-                <label className="block text-black font-semibold mb-2">
-                  Bathrooms
-                </label>
-
-                <input
-                  type="number"
-                  placeholder="2"
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-black"
-                  required
-                  min={1}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-black font-semibold mb-2">
-                Description
-              </label>
-  
-              <textarea
-                required
-                rows={5}
-                placeholder="Describe the property..."
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
-              />
-            </div>
-
-            <div>
-              <label className="block text-black font-semibold mb-2">
-                Property Images
-              </label>
-
-              <input
-                type="file"
-                multiple
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white"
-                required
-              />
-
-              <p className="text-sm text-gray-500 mt-2">
-                Upload high-quality property photos.
-              </p>
-            </div>
-  
-            <button
-              type="submit"
-              className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3 rounded-lg font-semibold transition"
-            >
-              Submit Listing
-            </button>
-          </form>
+          />
         </div>
       </main>
     );

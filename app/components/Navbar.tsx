@@ -58,7 +58,7 @@ export default function Navbar() {
                   Add Listing
                 </Link>
 
-                <Link href="/admin">
+                <Link href="/my-listings">
                   Manage Listings
                 </Link>
 
