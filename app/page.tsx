@@ -2,15 +2,20 @@
 
 import { properties } from "@/data/properties";
 import Link from "next/link";
+import type { FormEvent } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
-  const filteredProperties = properties.filter((property) =>
-    property.location.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+
+  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const query = searchTerm.trim();
+    router.push(query ? `/listings?search=${encodeURIComponent(query)}` : "/listings");
+  }
 
   return (
     <main className="min-h-screen bg-gray-100">
@@ -25,11 +30,13 @@ export default function Home() {
             Manage listings, clients, and property activity with EthioMLS.
           </p>
 
-          <form>
+          <form onSubmit={handleSearchSubmit}>
             <div className="flex flex-col md:flex-row gap-4">
               <input
                 type="text"
                 placeholder="Search by city, neighborhood, or title..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
                 className="flex-1 px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700"
               />
 

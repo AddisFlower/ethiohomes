@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { properties } from "@/data/properties";
@@ -11,19 +11,12 @@ function ListingsContent() {
   // TODO: Replace this mock agent ID with the authenticated user's ID
   // once login/auth is implemented.
   const currentAgentId = "agent-1";
-  const [searchTerm, setSearchTerm] = useState("");
+  const searchParams = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(
+    () => searchParams.get("search") ?? ""
+  );
   const [listingStatus, setListingStatus] = useState("ALL");
   const [propertyType, setPropertyType] = useState("ALL");
-
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    const search = searchParams.get("search");
-
-    if (search) {
-      setSearchTerm(search);
-    }
-  }, [searchParams]);
 
   const filteredProperties = properties.filter((property) => {
     const search = searchTerm.toLowerCase();

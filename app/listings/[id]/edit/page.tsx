@@ -16,6 +16,9 @@ export default async function EditListingPage({
 }) {
   const { id } = await params;
   const property = properties.find((p) => p.id === id);
+  // TODO: Replace this mock agent ID with the authenticated user's ID
+  // once login/auth is implemented.
+  const currentAgentId = "agent-1";
 
   if (!property) {
     return (
@@ -27,6 +30,22 @@ export default async function EditListingPage({
 
           <p className="text-gray-600">
             No listing exists for this property ID.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (property.ownerId !== currentAgentId) {
+    return (
+      <main className="min-h-screen bg-gray-100 py-12 px-6">
+        <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
+          <h1 className="text-4xl font-bold text-black mb-4">
+            Access denied
+          </h1>
+
+          <p className="text-gray-600">
+            You do not have permission to edit this listing.
           </p>
         </div>
       </main>

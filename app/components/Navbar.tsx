@@ -124,17 +124,20 @@ export default function Navbar() {
           </div>
         </div>
 
+        {/* TODO: Replace this mock agent profile with authenticated user data once auth is implemented. */}
         <div className="relative group ml-auto">
           <button className="border border-emerald-700 text-emerald-700 px-4 py-2 rounded-full font-semibold hover:bg-emerald-100 transition">
-            Login ▾
+            Mac Yifru ▾
           </button>
 
           <div className="hidden group-hover:block absolute right-0 top-full mt-0 w-56 bg-white border-2 border-emerald-700 rounded-lg shadow-xl p-5 z-50">
             <div className="flex flex-col gap-3 text-gray-700">
               <Link href="/">Dashboard</Link>
+              <Link href="/my-listings">My Listings</Link>
               <Link href="/">Subscription</Link>
               <Link href="/">Billing</Link>
               <Link href="/">Settings</Link>
+              {/* TODO: Wire logout to the real authentication system once auth is implemented. */}
               <Link href="/">Logout</Link>
             </div>
           </div>
