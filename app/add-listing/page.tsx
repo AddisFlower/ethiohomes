@@ -21,11 +21,10 @@ export default function AddListingPage() {
               <p className="text-sm">
                 Status: Pending Approval. An admin will review it before it becomes active.
               </p>
+              {/* TODO: Persist submitted listings once database storage is implemented. */}
               
-              {/* Later this will route to /my-listings 
-                  and show only listings owned by the current agent */}
               <Link
-                href="/listings"
+                href="/my-listings"
                 className="inline-block bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg font-semibold transition"
               >
                 View My Listings

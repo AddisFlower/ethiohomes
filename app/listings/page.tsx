@@ -124,9 +124,11 @@ function ListingsContent() {
                   </Link>
 
                   {isOwner ? (
-                    <button className="w-full border border-gray-300 hover:border-emerald-700 hover:text-emerald-700 text-black py-3 rounded-lg transition">
-                      Edit Listing
-                    </button>
+                    <Link href={`/listings/${property.id}/edit`}>
+                      <button className="w-full border border-gray-300 hover:border-emerald-700 hover:text-emerald-700 text-black py-3 rounded-lg transition">
+                        Edit Listing
+                      </button>
+                    </Link>
                   ) : (
                     <button className="w-full border border-gray-300 hover:border-emerald-700 hover:text-emerald-700 text-black py-3 rounded-lg transition">
                       Request Showing
@@ -138,6 +140,30 @@ function ListingsContent() {
             );
           })}
         </div>
+
+        {filteredProperties.length === 0 && (
+          <div className="bg-white rounded-xl shadow-md p-8 text-center">
+            <h2 className="text-2xl font-bold text-black mb-3">
+              No listings found
+            </h2>
+
+            <p className="text-gray-600 mb-6">
+              Try adjusting your search, listing status, or property type.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm("");
+                setListingStatus("ALL");
+                setPropertyType("ALL");
+              }}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white px-6 py-3 rounded-lg font-semibold transition"
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
       </div>
     </main>
   );

@@ -198,9 +198,9 @@ export default function PropertyForm({
             type="file"
             multiple
             className="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white"
-            required
           />
 
+          {/* TODO: Require property image uploads once photo management is implemented. */}
           <p className="text-sm text-gray-500 mt-2">
             Upload high-quality property photos.
           </p>

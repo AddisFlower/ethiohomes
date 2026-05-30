@@ -1,15 +1,7 @@
+import Link from "next/link";
 import { properties } from "@/data/properties";
-import EditListingForm from "./EditListingForm";
 
-function getNumericPrice(price: string) {
-  return price.replace(/\D/g, "");
-}
-
-function getCity(location: string) {
-  return location.split(",")[0]?.trim() || location;
-}
-
-export default async function EditListingPage({
+export default async function ManagePhotosPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -45,7 +37,7 @@ export default async function EditListingPage({
           </h1>
 
           <p className="text-gray-600">
-            You do not have permission to edit this listing.
+            You do not have permission to manage photos for this listing.
           </p>
         </div>
       </main>
@@ -55,24 +47,28 @@ export default async function EditListingPage({
   return (
     <main className="min-h-screen bg-gray-100 py-12 px-6">
       <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
-        <h1 className="text-4xl font-bold text-black mb-8">
-          Edit Property Listing
+        <h1 className="text-4xl font-bold text-black mb-4">
+          Manage Photos
         </h1>
 
-        <EditListingForm
-          listingId={property.id}
-          defaultValues={{
-            title: property.title,
-            price: getNumericPrice(property.price),
-            city: getCity(property.location),
-            propertyType: property.propertyType,
-            listingType: property.status,
-            bedrooms: property.bedrooms,
-            bathrooms: property.bathrooms,
-            description: property.description,
-            image: property.image,
-          }}
-        />
+        <p className="text-gray-600 mb-6">
+          {property.title}
+        </p>
+
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-5 text-emerald-800 mb-6">
+          <p className="font-semibold">Photo management coming soon.</p>
+          <p className="text-sm">
+            Image uploads and photo ordering will be added after photo
+            management is implemented.
+          </p>
+        </div>
+
+        <Link
+          href={`/listings/${property.id}`}
+          className="inline-block bg-emerald-700 hover:bg-emerald-800 text-white px-6 py-3 rounded-lg font-semibold transition"
+        >
+          Back to Listing
+        </Link>
       </div>
     </main>
   );

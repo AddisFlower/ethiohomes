@@ -20,6 +20,26 @@ export default function MyListingsPage() {
           Manage your active and pending property listings.
         </p>
 
+        {myListings.length === 0 && (
+          <div className="bg-white rounded-xl shadow-md p-8 text-center">
+            <h2 className="text-2xl font-bold text-black mb-3">
+              You do not have any listings yet
+            </h2>
+
+            <p className="text-gray-600 mb-6">
+              Add your first property listing to start managing it from this
+              page.
+            </p>
+
+            <Link
+              href="/add-listing"
+              className="inline-block bg-emerald-700 hover:bg-emerald-800 text-white px-6 py-3 rounded-lg font-semibold transition"
+            >
+              Add Listing
+            </Link>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {myListings.map((property) => (
             <div
