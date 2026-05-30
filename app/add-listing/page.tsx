@@ -7,6 +7,7 @@ import PropertyForm from "@/components/PropertyForm";
 
 export default function AddListingPage() {
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
 
     return (
       <main className="min-h-screen bg-gray-100 py-12 px-6">
@@ -32,10 +33,30 @@ export default function AddListingPage() {
             </div>
           )}
 
+          {error && (
+            <div className="mb-6 rounded-xl border border-red-300 bg-red-50 p-4 text-red-700">
+              <p className="font-semibold">Listing could not be submitted.</p>
+              <p className="text-sm">{error}</p>
+            </div>
+          )}
+
           <PropertyForm
             mode="create"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
+              setError("");
+
+              const response = await fetch("/api/listings", {
+                method: "POST",
+                body: new FormData(e.currentTarget),
+              });
+
+              if (!response.ok) {
+                const result = await response.json();
+                setError(result.error ?? "Please try again.");
+                return;
+              }
+
               setSubmitted(true);
             }}
           />

@@ -17,8 +17,9 @@ export default function ListingDetailActions({
   const [showingRequested, setShowingRequested] = useState(false);
   const [listingSaved, setListingSaved] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
-  function handleDelete() {
+  async function handleDelete() {
     const confirmed = window.confirm(
       "Are you sure you want to delete this listing?"
     );
@@ -27,7 +28,18 @@ export default function ListingDetailActions({
       return;
     }
 
-    // TODO: Replace this mock delete flow with persistent listing deletion.
+    // TODO: Replace the mocked owner context with authenticated user checks.
+    setDeleteError("");
+    const response = await fetch(`/api/listings/${listingId}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      setDeleteError(result.error ?? "Please try again.");
+      return;
+    }
+
     setDeleted(true);
     window.setTimeout(() => {
       router.push("/my-listings");
@@ -60,6 +72,13 @@ export default function ListingDetailActions({
           <p className="text-sm">
             This listing has been added to your saved list for this MVP flow.
           </p>
+        </div>
+      )}
+
+      {deleteError && (
+        <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-700">
+          <p className="font-semibold">Listing could not be deleted.</p>
+          <p className="text-sm">{deleteError}</p>
         </div>
       )}
 

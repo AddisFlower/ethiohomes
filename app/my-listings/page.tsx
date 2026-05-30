@@ -1,13 +1,11 @@
 import Link from "next/link";
-import { properties } from "@/data/properties";
+import { getListingsByOwner } from "@/lib/listings";
 
-export default function MyListingsPage() {
+export default async function MyListingsPage() {
   // TODO: Replace this mock agent ID with the authenticated user's ID
   // once login/auth is implemented.
   const currentAgentId = "agent-1";
-  const myListings = properties.filter(
-    (property) => property.ownerId === currentAgentId
-  );
+  const myListings = await getListingsByOwner(currentAgentId);
 
   return (
     <main className="min-h-screen bg-gray-100 py-12 px-6">

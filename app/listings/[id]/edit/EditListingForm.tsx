@@ -16,6 +16,7 @@ export default function EditListingForm({
   defaultValues,
 }: EditListingFormProps) {
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
   return (
     <>
@@ -46,11 +47,32 @@ export default function EditListingForm({
         </div>
       )}
 
+      {error && (
+        <div className="mb-6 rounded-xl border border-red-300 bg-red-50 p-4 text-red-700">
+          <p className="font-semibold">Listing changes could not be saved.</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
+
       <PropertyForm
         mode="edit"
         defaultValues={defaultValues}
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
+
+          setError("");
+
+          const response = await fetch(`/api/listings/${listingId}`, {
+            method: "PUT",
+            body: new FormData(event.currentTarget),
+          });
+
+          if (!response.ok) {
+            const result = await response.json();
+            setError(result.error ?? "Please try again.");
+            return;
+          }
+
           setSaved(true);
         }}
       />

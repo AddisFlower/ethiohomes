@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { properties } from "@/data/properties";
+import { getListingById } from "@/lib/listings";
 
 export default async function ManagePhotosPage({
   params,
@@ -7,7 +7,7 @@ export default async function ManagePhotosPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const property = properties.find((p) => p.id === id);
+  const property = await getListingById(id);
   // TODO: Replace this mock agent ID with the authenticated user's ID
   // once login/auth is implemented.
   const currentAgentId = "agent-1";

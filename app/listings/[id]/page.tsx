@@ -1,4 +1,4 @@
-import { properties } from "@/data/properties";
+import { getListingById } from "@/lib/listings";
 import ListingDetailActions from "./ListingDetailActions";
 
 export default async function PropertyDetails({
@@ -8,7 +8,7 @@ export default async function PropertyDetails({
 }) {
   const { id } = await params;
 
-  const property = properties.find((p) => p.id === id);
+  const property = await getListingById(id);
 
   const currentAgentId = "agent-1";
   const isOwner = property?.ownerId === currentAgentId;

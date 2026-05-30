@@ -1,4 +1,4 @@
-import { properties } from "@/data/properties";
+import { getListingById } from "@/lib/listings";
 import EditListingForm from "./EditListingForm";
 
 function getNumericPrice(price: string) {
@@ -15,7 +15,7 @@ export default async function EditListingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const property = properties.find((p) => p.id === id);
+  const property = await getListingById(id);
   // TODO: Replace this mock agent ID with the authenticated user's ID
   // once login/auth is implemented.
   const currentAgentId = "agent-1";
