@@ -44,11 +44,12 @@ export default function AddListingPage() {
             mode="create"
             onSubmit={async (e) => {
               e.preventDefault();
+              const form = e.currentTarget;
               setError("");
 
               const response = await fetch("/api/listings", {
                 method: "POST",
-                body: new FormData(e.currentTarget),
+                body: new FormData(form),
               });
 
               if (!response.ok) {

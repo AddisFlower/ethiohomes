@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getListingById } from "@/lib/listings";
+import PhotoManagementForm from "./PhotoManagementForm";
 
 export default async function ManagePhotosPage({
   params,
@@ -55,17 +56,19 @@ export default async function ManagePhotosPage({
           {property.title}
         </p>
 
-        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-5 text-emerald-800 mb-6">
-          <p className="font-semibold">Photo management coming soon.</p>
-          <p className="text-sm">
-            Image uploads and photo ordering will be added after photo
-            management is implemented.
-          </p>
+        <div className="mb-6">
+          <img
+            src={property.image}
+            alt={property.title}
+            className="h-72 w-full rounded-xl object-cover"
+          />
         </div>
+
+        <PhotoManagementForm listingId={property.id} />
 
         <Link
           href={`/listings/${property.id}`}
-          className="inline-block bg-emerald-700 hover:bg-emerald-800 text-white px-6 py-3 rounded-lg font-semibold transition"
+          className="mt-6 inline-block border border-emerald-700 text-emerald-700 hover:bg-emerald-100 px-6 py-3 rounded-lg font-semibold transition"
         >
           Back to Listing
         </Link>

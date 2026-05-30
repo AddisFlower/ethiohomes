@@ -190,19 +190,18 @@ export default function PropertyForm({
       ) : (
         <div>
           <label className="block text-black font-semibold mb-2">
-            Property Images
+            Primary Property Image
           </label>
 
           <input
-            name="images"
+            name="imageFile"
             type="file"
-            multiple
+            accept="image/*"
             className="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white"
           />
 
-          {/* TODO: Require property image uploads once photo management is implemented. */}
           <p className="text-sm text-gray-500 mt-2">
-            Upload high-quality property photos.
+            Upload one high-quality photo for this listing.
           </p>
         </div>
       )}

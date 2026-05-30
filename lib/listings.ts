@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { properties as mockProperties } from "@/data/properties";
-import { supabaseRequest } from "@/lib/supabase";
+import {
+  supabaseRequest,
+  uploadSupabaseStorageObject,
+} from "@/lib/supabase";
 
 export type Property = {
   id: string;
@@ -40,12 +43,13 @@ type ListingRow = {
   owner_id: string;
 };
 
-type ListingIdRow = {
-  listing_id: string;
+type ListingOwnerRow = {
+  owner_id: string;
 };
 
 const fallbackImage =
   "https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1200&auto=format&fit=crop";
+const listingImagesBucket = "listing-images";
 
 function toProperty(row: ListingRow): Property {
   return {
@@ -68,9 +72,11 @@ function toProperty(row: ListingRow): Property {
   };
 }
 
-function fromFormData(formData: FormData) {
+function fromFormData(formData: FormData, imageUrl?: string) {
   const city = String(formData.get("city") ?? "Addis Ababa");
   const price = Number(formData.get("price") ?? 0);
+  const image =
+    (imageUrl ?? String(formData.get("image") ?? "")) || fallbackImage;
 
   return {
     title: String(formData.get("title") ?? ""),
@@ -81,27 +87,56 @@ function fromFormData(formData: FormData) {
     bedrooms: Number(formData.get("bedrooms") ?? 0),
     bathrooms: Number(formData.get("bathrooms") ?? 0),
     description: String(formData.get("description") ?? ""),
-    image: String(formData.get("image") ?? "") || fallbackImage,
+    image,
     updated_at_label: "Updated just now",
   };
 }
 
-async function getNextListingId() {
-  const rows = await supabaseRequest<ListingIdRow[]>(
-    "/listings?select=listing_id"
+function getImageFile(formData: FormData) {
+  const file = formData.get("imageFile");
+
+  if (!(file instanceof File) || file.size === 0) {
+    return null;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Please upload an image file.");
+  }
+
+  return file;
+}
+
+function getFileExtension(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+
+  if (extension && /^[a-z0-9]+$/.test(extension)) {
+    return extension;
+  }
+
+  return file.type.split("/")[1] || "jpg";
+}
+
+async function uploadListingImage(formData: FormData, listingId: string) {
+  const file = getImageFile(formData);
+
+  if (!file) {
+    return undefined;
+  }
+
+  const extension = getFileExtension(file);
+  const path = `${listingId}/primary-${randomUUID()}.${extension}`;
+
+  return uploadSupabaseStorageObject(listingImagesBucket, path, file);
+}
+
+async function assertListingOwner(id: string, ownerId: string) {
+  const rows = await supabaseRequest<ListingOwnerRow[]>(
+    `/listings?select=owner_id&id=eq.${encodeURIComponent(id)}&limit=1`
   );
 
-  const highestListingNumber = rows.reduce((highest, row) => {
-    const match = row.listing_id.match(/^MLS-(\d+)$/);
-
-    if (!match) {
-      return highest;
-    }
-
-    return Math.max(highest, Number(match[1]));
-  }, 1000);
-
-  return `MLS-${highestListingNumber + 1}`;
+  if (!rows[0] || rows[0].owner_id !== ownerId) {
+    throw new Error("Listing not found or access denied.");
+  }
 }
 
 export async function getListings(): Promise<Property[]> {
@@ -141,11 +176,11 @@ export async function getListingsByOwner(ownerId: string): Promise<Property[]> {
 }
 
 export async function createListing(formData: FormData, ownerId: string) {
-  const listingId = await getNextListingId();
+  const id = randomUUID();
+  const imageUrl = await uploadListingImage(formData, id);
   const body = {
-    ...fromFormData(formData),
-    id: randomUUID(),
-    listing_id: listingId,
+    ...fromFormData(formData, imageUrl),
+    id,
     verified: false,
     agent: "Mac Yifru",
     approval_status: "Pending",
@@ -159,6 +194,42 @@ export async function createListing(formData: FormData, ownerId: string) {
     },
     body: JSON.stringify(body),
   });
+
+  return toProperty(rows[0]);
+}
+
+export async function updateListingPhoto(
+  id: string,
+  formData: FormData,
+  ownerId: string
+) {
+  await assertListingOwner(id, ownerId);
+
+  const imageUrl = await uploadListingImage(formData, id);
+
+  if (!imageUrl) {
+    throw new Error("Please choose a photo to upload.");
+  }
+
+  const rows = await supabaseRequest<ListingRow[]>(
+    `/listings?id=eq.${encodeURIComponent(id)}&owner_id=eq.${encodeURIComponent(
+      ownerId
+    )}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        image: imageUrl,
+        updated_at_label: "Updated just now",
+      }),
+    }
+  );
+
+  if (!rows[0]) {
+    throw new Error("Listing not found or access denied.");
+  }
 
   return toProperty(rows[0]);
 }

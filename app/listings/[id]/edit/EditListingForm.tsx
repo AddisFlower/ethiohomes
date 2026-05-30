@@ -59,12 +59,13 @@ export default function EditListingForm({
         defaultValues={defaultValues}
         onSubmit={async (event) => {
           event.preventDefault();
+          const form = event.currentTarget;
 
           setError("");
 
           const response = await fetch(`/api/listings/${listingId}`, {
             method: "PUT",
-            body: new FormData(event.currentTarget),
+            body: new FormData(form),
           });
 
           if (!response.ok) {

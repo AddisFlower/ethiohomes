@@ -19,6 +19,22 @@ create table if not exists public.listings (
   updated_at timestamptz not null default now()
 );
 
+create sequence if not exists public.listing_id_seq
+  as integer
+  start with 1004
+  increment by 1
+  minvalue 1;
+
+create or replace function public.next_listing_id()
+returns text as $$
+begin
+  return 'MLS-' || nextval('public.listing_id_seq')::text;
+end;
+$$ language plpgsql;
+
+alter table public.listings
+alter column listing_id set default public.next_listing_id();
+
 create index if not exists listings_owner_id_idx on public.listings(owner_id);
 create index if not exists listings_status_idx on public.listings(status);
 create index if not exists listings_property_type_idx on public.listings(property_type);
@@ -126,3 +142,19 @@ on conflict (id) do update set
   description = excluded.description,
   image = excluded.image,
   owner_id = excluded.owner_id;
+
+select setval(
+  'public.listing_id_seq',
+  greatest(
+    1003,
+    coalesce(
+      (
+        select max(substring(listing_id from 5)::integer)
+        from public.listings
+        where listing_id ~ '^MLS-[0-9]{4,6}$'
+      ),
+      1003
+    )
+  ),
+  true
+);
