@@ -1,11 +1,16 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { canUseAgentFeatures, getAppSession } from "@/lib/auth";
 import { getListingsByOwner } from "@/lib/listings";
 
 export default async function MyListingsPage() {
-  // TODO: Replace this mock agent ID with the authenticated user's ID
-  // once login/auth is implemented.
-  const currentAgentId = "agent-1";
-  const myListings = await getListingsByOwner(currentAgentId);
+  const session = await getAppSession();
+
+  if (!canUseAgentFeatures(session)) {
+    redirect("/login");
+  }
+
+  const myListings = await getListingsByOwner(session.user.id);
 
   return (
     <main className="min-h-screen bg-gray-100 py-12 px-6">
@@ -61,6 +66,12 @@ export default async function MyListingsPage() {
 
                 <p className="text-gray-600 mb-4">{property.location}</p>
 
+                {property.address && (
+                  <p className="text-gray-500 text-sm mb-4">
+                    {property.address}
+                  </p>
+                )}
+
                 <div className="flex flex-wrap gap-2 mb-4">
                   <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
                     {property.status}
@@ -86,6 +97,14 @@ export default async function MyListingsPage() {
                     </span>
                   </div>
                 </div>
+
+                {property.approvalStatus === "Rejected" &&
+                  property.rejectionReason && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 mb-4 text-sm text-red-700">
+                      <p className="font-semibold">Rejection reason</p>
+                      <p>{property.rejectionReason}</p>
+                    </div>
+                  )}
 
                 <div className="flex flex-col gap-3">
                   <Link href={`/listings/${property.id}/edit`}>

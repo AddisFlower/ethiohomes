@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getListingById } from "@/lib/listings";
+import { canManageListing, getAppSession } from "@/lib/auth";
 import PhotoManagementForm from "./PhotoManagementForm";
 
 export default async function ManagePhotosPage({
@@ -9,9 +11,7 @@ export default async function ManagePhotosPage({
 }) {
   const { id } = await params;
   const property = await getListingById(id);
-  // TODO: Replace this mock agent ID with the authenticated user's ID
-  // once login/auth is implemented.
-  const currentAgentId = "agent-1";
+  const session = await getAppSession();
 
   if (!property) {
     return (
@@ -29,7 +29,11 @@ export default async function ManagePhotosPage({
     );
   }
 
-  if (property.ownerId !== currentAgentId) {
+  if (session.role === "public") {
+    redirect("/login");
+  }
+
+  if (!canManageListing(session, property)) {
     return (
       <main className="min-h-screen bg-gray-100 py-12 px-6">
         <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg">

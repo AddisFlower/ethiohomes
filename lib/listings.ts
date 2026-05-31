@@ -11,6 +11,7 @@ export type Property = {
   title: string;
   price: string;
   location: string;
+  address: string | null;
   propertyType: string;
   status: string;
   verified: boolean;
@@ -19,6 +20,7 @@ export type Property = {
   agent: string;
   updatedAt: string;
   approvalStatus: string;
+  rejectionReason: string | null;
   description: string;
   image: string;
   ownerId: string;
@@ -30,6 +32,7 @@ type ListingRow = {
   title: string;
   price: string;
   location: string;
+  address: string | null;
   property_type: string;
   status: string;
   verified: boolean;
@@ -38,6 +41,7 @@ type ListingRow = {
   agent: string;
   updated_at_label: string;
   approval_status: string;
+  rejection_reason: string | null;
   description: string;
   image: string;
   owner_id: string;
@@ -58,6 +62,7 @@ function toProperty(row: ListingRow): Property {
     title: row.title,
     price: row.price,
     location: row.location,
+    address: row.address,
     propertyType: row.property_type,
     status: row.status,
     verified: row.verified,
@@ -66,6 +71,7 @@ function toProperty(row: ListingRow): Property {
     agent: row.agent,
     updatedAt: row.updated_at_label,
     approvalStatus: row.approval_status,
+    rejectionReason: row.rejection_reason,
     description: row.description,
     image: row.image,
     ownerId: row.owner_id,
@@ -82,6 +88,7 @@ function fromFormData(formData: FormData, imageUrl?: string) {
     title: String(formData.get("title") ?? ""),
     price: `${price.toLocaleString("en-US")} ETB`,
     location: city,
+    address: String(formData.get("address") ?? ""),
     property_type: String(formData.get("propertyType") ?? "Apartment"),
     status: String(formData.get("listingType") ?? "FOR SALE"),
     bedrooms: Number(formData.get("bedrooms") ?? 0),
@@ -175,14 +182,38 @@ export async function getListingsByOwner(ownerId: string): Promise<Property[]> {
   }
 }
 
-export async function createListing(formData: FormData, ownerId: string) {
+export type AdminListingStatusFilter =
+  | "All"
+  | "Pending"
+  | "Approved"
+  | "Rejected";
+
+export async function getAdminListings(
+  status: AdminListingStatusFilter = "Pending"
+): Promise<Property[]> {
+  const statusFilter =
+    status === "All"
+      ? ""
+      : `&approval_status=eq.${encodeURIComponent(status)}`;
+  const rows = await supabaseRequest<ListingRow[]>(
+    `/listings?select=*${statusFilter}&order=updated_at.desc`
+  );
+
+  return rows.map(toProperty);
+}
+
+export async function createListing(
+  formData: FormData,
+  ownerId: string,
+  agentName: string
+) {
   const id = randomUUID();
   const imageUrl = await uploadListingImage(formData, id);
   const body = {
     ...fromFormData(formData, imageUrl),
     id,
     verified: false,
-    agent: "Mac Yifru",
+    agent: agentName,
     approval_status: "Pending",
     owner_id: ownerId,
   };
@@ -194,6 +225,40 @@ export async function createListing(formData: FormData, ownerId: string) {
     },
     body: JSON.stringify(body),
   });
+
+  return toProperty(rows[0]);
+}
+
+export async function updateListingApproval(
+  id: string,
+  approvalStatus: "Approved" | "Rejected",
+  rejectionReason?: string
+) {
+  const reason = rejectionReason?.trim() ?? "";
+
+  if (approvalStatus === "Rejected" && !reason) {
+    throw new Error("Rejection reason is required.");
+  }
+
+  const rows = await supabaseRequest<ListingRow[]>(
+    `/listings?id=eq.${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        approval_status: approvalStatus,
+        verified: approvalStatus === "Approved",
+        rejection_reason: approvalStatus === "Rejected" ? reason : null,
+        updated_at_label: "Updated just now",
+      }),
+    }
+  );
+
+  if (!rows[0]) {
+    throw new Error("Listing not found.");
+  }
 
   return toProperty(rows[0]);
 }
@@ -239,7 +304,28 @@ export async function updateListing(
   formData: FormData,
   ownerId: string
 ) {
-  const body = fromFormData(formData);
+  const existingRows = await supabaseRequest<
+    Pick<ListingRow, "approval_status">[]
+  >(
+    `/listings?select=approval_status&id=eq.${encodeURIComponent(
+      id
+    )}&owner_id=eq.${encodeURIComponent(ownerId)}&limit=1`
+  );
+
+  if (!existingRows[0]) {
+    throw new Error("Listing not found or access denied.");
+  }
+
+  const body = {
+    ...fromFormData(formData),
+    ...(existingRows[0].approval_status === "Rejected"
+      ? {
+          approval_status: "Pending",
+          verified: false,
+          rejection_reason: null,
+        }
+      : {}),
+  };
 
   const rows = await supabaseRequest<ListingRow[]>(
     `/listings?id=eq.${encodeURIComponent(id)}&owner_id=eq.${encodeURIComponent(

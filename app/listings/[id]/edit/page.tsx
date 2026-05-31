@@ -1,5 +1,7 @@
 import { getListingById } from "@/lib/listings";
+import { canManageListing, getAppSession } from "@/lib/auth";
 import EditListingForm from "./EditListingForm";
+import { redirect } from "next/navigation";
 
 function getNumericPrice(price: string) {
   return price.replace(/\D/g, "");
@@ -16,9 +18,7 @@ export default async function EditListingPage({
 }) {
   const { id } = await params;
   const property = await getListingById(id);
-  // TODO: Replace this mock agent ID with the authenticated user's ID
-  // once login/auth is implemented.
-  const currentAgentId = "agent-1";
+  const session = await getAppSession();
 
   if (!property) {
     return (
@@ -36,7 +36,11 @@ export default async function EditListingPage({
     );
   }
 
-  if (property.ownerId !== currentAgentId) {
+  if (session.role === "public") {
+    redirect("/login");
+  }
+
+  if (!canManageListing(session, property)) {
     return (
       <main className="min-h-screen bg-gray-100 py-12 px-6">
         <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
@@ -60,11 +64,14 @@ export default async function EditListingPage({
         </h1>
 
         <EditListingForm
+          approvalStatus={property.approvalStatus}
           listingId={property.id}
+          rejectionReason={property.rejectionReason}
           defaultValues={{
             title: property.title,
             price: getNumericPrice(property.price),
             city: getCity(property.location),
+            address: property.address ?? "",
             propertyType: property.propertyType,
             listingType: property.status,
             bedrooms: property.bedrooms,

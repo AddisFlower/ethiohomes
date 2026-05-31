@@ -1,4 +1,5 @@
 import { getListingById } from "@/lib/listings";
+import { canManageListing, getAppSession } from "@/lib/auth";
 import ListingDetailActions from "./ListingDetailActions";
 
 export default async function PropertyDetails({
@@ -9,9 +10,8 @@ export default async function PropertyDetails({
   const { id } = await params;
 
   const property = await getListingById(id);
-
-  const currentAgentId = "agent-1";
-  const isOwner = property?.ownerId === currentAgentId;
+  const session = await getAppSession();
+  const isOwner = property ? canManageListing(session, property) : false;
 
   if (!property) {
     return (
@@ -50,6 +50,12 @@ export default async function PropertyDetails({
           {property.location}
         </p>
 
+        {property.address && (
+          <p className="text-lg text-gray-700 mb-6">
+            {property.address}
+          </p>
+        )}
+
         <div className="flex flex-wrap gap-2 mb-6">
           <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-semibold">
             {property.status}
@@ -66,7 +72,14 @@ export default async function PropertyDetails({
           )}
         </div>
 
-        
+        {isOwner &&
+          property.approvalStatus === "Rejected" &&
+          property.rejectionReason && (
+            <div className="rounded-xl border border-red-300 bg-red-50 p-5 text-red-700 mb-8">
+              <p className="font-semibold">Listing rejected.</p>
+              <p className="text-sm mt-1">{property.rejectionReason}</p>
+            </div>
+          )}
 
         <div className="bg-white rounded-xl shadow-md p-5 mb-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div>

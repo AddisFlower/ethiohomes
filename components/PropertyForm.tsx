@@ -1,11 +1,13 @@
 "use client";
 
 import type { FormEvent } from "react";
+import type { ReactNode } from "react";
 
 export type PropertyFormDefaultValues = {
   title?: string;
   price?: string | number;
   city?: string;
+  address?: string;
   propertyType?: string;
   listingType?: string;
   bedrooms?: string | number;
@@ -15,12 +17,14 @@ export type PropertyFormDefaultValues = {
 };
 
 type PropertyFormProps = {
+  actionSlot?: ReactNode;
   mode: "create" | "edit";
   defaultValues?: PropertyFormDefaultValues;
   onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
 };
 
 export default function PropertyForm({
+  actionSlot,
   mode,
   defaultValues,
   onSubmit,
@@ -84,6 +88,25 @@ export default function PropertyForm({
           <option>Hawassa</option>
           <option>Bahir Dar</option>
         </select>
+      </div>
+
+      <div>
+        <label className="block text-black font-semibold mb-2">
+          Property Address
+        </label>
+
+        <input
+          name="address"
+          type="text"
+          required
+          placeholder="Bole Rwanda Embassy Area, House No. B-214"
+          defaultValue={defaultValues?.address}
+          className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
+        />
+
+        <p className="text-sm text-gray-500 mt-2">
+          Use the street, building, compound, or landmark-level address.
+        </p>
       </div>
 
       <div>
@@ -206,12 +229,20 @@ export default function PropertyForm({
         </div>
       )}
 
-      <button
-        type="submit"
-        className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3 rounded-lg font-semibold transition"
+      <div
+        className={
+          actionSlot ? "grid grid-cols-1 sm:grid-cols-2 gap-3" : undefined
+        }
       >
-        {isEditMode ? "Save Listing" : "Submit Listing"}
-      </button>
+        <button
+          type="submit"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3 rounded-lg font-semibold transition"
+        >
+          {isEditMode ? "Save Listing" : "Submit Listing"}
+        </button>
+
+        {actionSlot}
+      </div>
     </form>
   );
 }

@@ -157,11 +157,6 @@ export default function HomeContent({ properties }: HomeContentProps) {
                     {property.status}
                   </span>
 
-                  {property.verified && (
-                    <span className="bg-black text-white px-3 py-1 rounded-full text-sm font-semibold">
-                      VERIFIED
-                    </span>
-                  )}
                 </div>
                 <h3 className="text-2xl font-semibold text-black mb-2">
                   {property.title}

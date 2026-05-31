@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
+import { canUseAgentFeatures, getAppSession } from "@/lib/auth";
 import { updateListingPhoto } from "@/lib/listings";
-
-const currentAgentId = "agent-1";
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getAppSession();
+
+    if (!canUseAgentFeatures(session)) {
+      return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+    }
+
     const { id } = await params;
     const formData = await request.formData();
-    const listing = await updateListingPhoto(id, formData, currentAgentId);
+    const listing = await updateListingPhoto(id, formData, session.user.id);
 
     return NextResponse.json({ listing });
   } catch (error) {

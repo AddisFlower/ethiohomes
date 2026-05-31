@@ -1,4 +1,4 @@
-function getSupabaseConfig() {
+export function getSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY ??
@@ -9,6 +9,7 @@ function getSupabaseConfig() {
   }
 
   return {
+    authUrl: `${url.replace(/\/$/, "")}/auth/v1`,
     restUrl: `${url.replace(/\/$/, "")}/rest/v1`,
     storageUrl: `${url.replace(/\/$/, "")}/storage/v1`,
     key,

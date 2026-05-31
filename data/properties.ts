@@ -5,6 +5,7 @@ export const properties = [
     title: "Modern Apartment in Bole",
     price: "12,500,000 ETB",
     location: "Addis Ababa, Bole",
+    address: "Bole Rwanda Embassy Area, House No. B-214",
     propertyType: "Apartment",
     status: "FOR SALE",
     verified: true,
@@ -13,6 +14,7 @@ export const properties = [
     agent: "Dawit Realty",
     updatedAt: "Updated 2 hours ago",
     approvalStatus: "Approved",
+    rejectionReason: null,
     description:
       "Beautiful modern apartment located in the heart of Bole near restaurants, shopping centers, and schools.",
     image:
@@ -25,6 +27,7 @@ export const properties = [
     propertyType: "Villa",
     price: "28,000,000 ETB",
     location: "Addis Ababa, Summit",
+    address: "Summit Figa, near Safari Apartments, Villa 18",
     status: "FOR RENT",
     verified: true,
     bedrooms: 5,
@@ -33,6 +36,7 @@ export const properties = [
     agent: "Habesha Properties",
     updatedAt: "Updated yesterday",
     approvalStatus: "Pending",
+    rejectionReason: null,
     description:
       "Spacious luxury villa with modern architecture, large outdoor area, and premium finishes.",
     image:
@@ -45,6 +49,7 @@ export const properties = [
     propertyType: "House",
     price: "18,750,000 ETB",
     location: "Addis Ababa, CMC",
+    address: "CMC Michael Road, behind Tsehay Real Estate, House 42",
     status: "FOR SALE",
     verified: false,
     bedrooms: 4,
@@ -52,7 +57,9 @@ export const properties = [
     listingId: "MLS-1003",
     agent: "Ethio Land Brokers",
     updatedAt: "Updated 3 days ago",
-    approvalStatus: "Draft",
+    approvalStatus: "Rejected",
+    rejectionReason:
+      "Please add clearer exterior photos and confirm the property address.",
     description:
       "Perfect family home in a quiet neighborhood with easy access to schools and shopping.",
     image:
