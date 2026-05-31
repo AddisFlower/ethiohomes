@@ -8,9 +8,15 @@ import type { Property } from "@/lib/listings";
 
 type HomeContentProps = {
   properties: Property[];
+  isAgent: boolean;
+  isAdmin: boolean;
 };
 
-export default function HomeContent({ properties }: HomeContentProps) {
+export default function HomeContent({
+  properties,
+  isAgent,
+  isAdmin,
+}: HomeContentProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
 
@@ -29,11 +35,15 @@ export default function HomeContent({ properties }: HomeContentProps) {
       <section className="bg-gradient-to-r from-slate-900 to-black text-white py-15 px-6">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Modern Tools for Ethiopian Real Estate
+            {isAgent || isAdmin
+              ? "Agent Dashboard"
+              : "Browse Ethiopian Real Estate"}
           </h1>
 
           <p className="text-lg text-gray-500 max-w-2xl mb-6">
-            Manage listings, clients, and property activity with EthioMLS.
+            {isAgent || isAdmin
+              ? "Manage listings, review activity, and keep your properties moving."
+              : "Search listings, compare properties, and connect with verified agents."}
           </p>
 
           <form onSubmit={handleSearchSubmit}>
@@ -79,53 +89,151 @@ export default function HomeContent({ properties }: HomeContentProps) {
               </button>
             </div>
           </form>
+
+          {!isAgent && !isAdmin && (
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-5 py-3 rounded-lg transition"
+              >
+                Sign In
+              </Link>
+
+              <Link
+                href="/signup"
+                className="inline-flex items-center justify-center border border-white/30 text-white font-semibold px-5 py-3 rounded-lg hover:bg-white/10 transition"
+              >
+                Create Agent Account
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* AGENT WORKSPACE */}
-      <section className="max-w-6xl mx-auto py-12 px-6">
-        <h2 className="text-3xl font-bold text-black mb-2">Agent Workspace</h2>
+      {(isAgent || isAdmin) && (
+        <section className="max-w-6xl mx-auto py-12 px-6">
+          <h2 className="text-3xl font-bold text-black mb-2">
+            {isAdmin ? "Admin and Agent Workspace" : "Agent Dashboard"}
+          </h2>
 
-        <p className="text-gray-600 mb-8">
-          Quick overview of your listings, clients, and daily activity.
-        </p>
+          <p className="text-gray-600 mb-8">
+            {isAdmin
+              ? "Review your listings and jump into admin tools when needed."
+              : "Quick access to your listings and the main agent actions."}
+          </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-emerald-700">
-            <h3 className="text-xl font-bold text-black mb-2">
-              Recent Listings
-            </h3>
-            <p className="text-3xl font-bold text-emerald-700 mb-3">12</p>
-            <p className="text-gray-600">Active listings currently managed.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-emerald-700">
+              <h3 className="text-xl font-bold text-black mb-2">
+                My Listings
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Open your active, pending, and rejected listings.
+              </p>
+              <Link
+                href="/my-listings"
+                className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
+              >
+                View My Listings
+              </Link>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
+              <h3 className="text-xl font-bold text-black mb-2">
+                Add Listing
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Submit a new property and send it for review.
+              </p>
+              <Link
+                href="/add-listing"
+                className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
+              >
+                Create Listing
+              </Link>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-600">
+              <h3 className="text-xl font-bold text-black mb-2">
+                Manage Listings
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Update your properties and handle ownership actions.
+              </p>
+              <div className="flex flex-col gap-3">
+                <Link
+                  href="/my-listings"
+                  className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
+                >
+                  Edit and Review
+                </Link>
+
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
+                  >
+                    Admin Dashboard
+                  </Link>
+                )}
+              </div>
+            </div>
           </div>
+        </section>
+      )}
 
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
-            <h3 className="text-xl font-bold text-black mb-2">
-              Client Inquiries
-            </h3>
-            <p className="text-3xl font-bold text-yellow-600 mb-3">5</p>
-            <p className="text-gray-600">New inquiries waiting for response.</p>
-          </div>
+      {!isAgent && !isAdmin && (
+        <section className="max-w-6xl mx-auto py-12 px-6">
+          <h2 className="text-3xl font-bold text-black mb-2">
+            Start Searching
+          </h2>
 
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-600">
-            <h3 className="text-xl font-bold text-black mb-2">
-              Pending Approvals
-            </h3>
-            <p className="text-3xl font-bold text-red-600 mb-3">2</p>
-            <p className="text-gray-600">
-              Listings awaiting admin verification.
-            </p>
-          </div>
+          <p className="text-gray-600 mb-8">
+            Browse listings now, or sign in to manage properties as an agent.
+          </p>
 
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-emerald-700">
-            <h3 className="text-xl font-bold text-black mb-2">
-              Upcoming Showings
-            </h3>
-            <p className="text-3xl font-bold text-emerald-700 mb-3">3</p>
-            <p className="text-gray-600">Scheduled property tours this week.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-emerald-700">
+              <h3 className="text-xl font-bold text-black mb-2">
+                Browse Listings
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Search the latest promoted properties across the marketplace.
+              </p>
+              <Link
+                href="/listings"
+                className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
+              >
+                Open Listings
+              </Link>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
+              <h3 className="text-xl font-bold text-black mb-2">
+                Agent Access
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Sign in or create an agent account to manage properties.
+              </p>
+              <div className="flex flex-col gap-3">
+                <Link
+                  href="/login"
+                  className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
+                >
+                  Sign In
+                </Link>
+
+                <Link
+                  href="/signup"
+                  className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
+                >
+                  Create Agent Account
+                </Link>
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* PROPERTY SECTION */}
       <section className="max-w-6xl mx-auto py-16 px-6">
