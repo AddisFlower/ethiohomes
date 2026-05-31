@@ -31,6 +31,8 @@ export type AppSession =
       profile: Profile;
     };
 
+export type AuthenticatedSession = Exclude<AppSession, { role: "public" }>;
+
 type SupabaseUserResponse = {
   id: string;
   email?: string;
@@ -166,11 +168,15 @@ export async function getAppSession(): Promise<AppSession> {
   };
 }
 
-export function canUseAgentFeatures(session: AppSession) {
+export function canUseAgentFeatures(
+  session: AppSession
+): session is AuthenticatedSession {
   return session.role === "agent" || session.role === "admin";
 }
 
-export function canUseAdminFeatures(session: AppSession) {
+export function canUseAdminFeatures(
+  session: AppSession
+): session is Extract<AppSession, { role: "admin" }> {
   return session.role === "admin";
 }
 
@@ -178,5 +184,9 @@ export function canManageListing(
   session: AppSession,
   listing: { ownerId: string }
 ) {
-  return canUseAgentFeatures(session) && listing.ownerId === session.user.id;
+  if (!canUseAgentFeatures(session)) {
+    return false;
+  }
+
+  return listing.ownerId === session.user.id;
 }

@@ -6,7 +6,7 @@ export async function POST(request: Request) {
   try {
     const session = await getAppSession();
 
-    if (!canUseAgentFeatures(session)) {
+    if (!canUseAgentFeatures(session) || !session.user) {
       return NextResponse.json({ error: "Sign in required." }, { status: 401 });
     }
 

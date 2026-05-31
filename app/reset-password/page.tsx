@@ -3,17 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function getRecoveryTokens() {
-  if (typeof window === "undefined") {
-    return {
-      accessToken: "",
-      refreshToken: "",
-      type: "",
-    };
-  }
-
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
   const searchParams = new URLSearchParams(window.location.search);
 
@@ -28,26 +20,55 @@ function getRecoveryTokens() {
 
 export default function ResetPasswordPage() {
   const router = useRouter();
-  const [recoveryTokens] = useState(getRecoveryTokens);
-  const [error, setError] = useState(() =>
-    recoveryTokens.accessToken
-      ? ""
-      : "Password reset token is missing or expired. Please request a new reset link."
-  );
+  const [recoveryTokens, setRecoveryTokens] = useState<{
+    accessToken: string;
+    refreshToken: string;
+    type: string;
+  } | null>(null);
+  const [hasCheckedRecovery, setHasCheckedRecovery] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [linkError, setLinkError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  useEffect(() => {
+    setRecoveryTokens(getRecoveryTokens());
+    setHasCheckedRecovery(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasCheckedRecovery) {
+      return;
+    }
+
+    if (!recoveryTokens?.accessToken) {
+      setLinkError(
+        "Password reset token is missing or expired. Please request a new reset link."
+      );
+      return;
+    }
+
+    setLinkError("");
+  }, [hasCheckedRecovery, recoveryTokens]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!recoveryTokens?.accessToken) {
+      setLinkError(
+        "Password reset token is missing or expired. Please request a new reset link."
+      );
+      return;
+    }
+
     const form = event.currentTarget;
     const formData = new FormData(form);
     const password = String(formData.get("password") ?? "");
     const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
-    setError("");
+    setSubmitError("");
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setSubmitError("Passwords do not match.");
       return;
     }
 
@@ -69,7 +90,7 @@ export default function ResetPasswordPage() {
 
     if (!response.ok) {
       const result = await response.json();
-      setError(result.error ?? "Please try again.");
+      setSubmitError(result.error ?? "Please try again.");
       return;
     }
 
@@ -92,59 +113,80 @@ export default function ResetPasswordPage() {
           Enter a new password for your EthioMLS account.
         </p>
 
-        {error && (
-          <div className="mb-6 rounded-xl border border-red-300 bg-red-50 p-4 text-red-700">
-            <p className="font-semibold">Password could not be updated.</p>
-            <p className="text-sm">{error}</p>
+        {!hasCheckedRecovery && (
+          <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-gray-700">
+            <p className="font-semibold">Checking reset link.</p>
+            <p className="text-sm">
+              Verifying your password reset link before showing the form.
+            </p>
           </div>
         )}
 
-        {success && (
+        {hasCheckedRecovery && submitError && (
+          <div className="mb-6 rounded-xl border border-red-300 bg-red-50 p-4 text-red-700">
+            <p className="font-semibold">Password could not be updated.</p>
+            <p className="text-sm">{submitError}</p>
+          </div>
+        )}
+
+        {hasCheckedRecovery && recoveryTokens?.accessToken && success && (
           <div className="mb-6 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-800">
             <p className="font-semibold">Password updated.</p>
             <p className="text-sm">Taking you to My Listings...</p>
           </div>
         )}
 
-        <form className="space-y-5" onSubmit={handleSubmit}>
-          <div>
-            <label className="block text-black font-semibold mb-2">
-              New Password
-            </label>
-            <input
-              name="password"
-              type="password"
-              required
-              minLength={6}
-              disabled={!recoveryTokens.accessToken || success}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black disabled:bg-gray-100"
-              placeholder="New password"
-            />
-          </div>
+        {hasCheckedRecovery && recoveryTokens?.accessToken ? (
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div>
+              <label className="block text-black font-semibold mb-2">
+                New Password
+              </label>
+              <input
+                name="password"
+                type="password"
+                required
+                minLength={6}
+                disabled={success}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black disabled:bg-gray-100"
+                placeholder="New password"
+              />
+            </div>
 
-          <div>
-            <label className="block text-black font-semibold mb-2">
-              Confirm Password
-            </label>
-            <input
-              name="confirmPassword"
-              type="password"
-              required
-              minLength={6}
-              disabled={!recoveryTokens.accessToken || success}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black disabled:bg-gray-100"
-              placeholder="Confirm password"
-            />
-          </div>
+            <div>
+              <label className="block text-black font-semibold mb-2">
+                Confirm Password
+              </label>
+              <input
+                name="confirmPassword"
+                type="password"
+                required
+                minLength={6}
+                disabled={success}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black disabled:bg-gray-100"
+                placeholder="Confirm password"
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={!recoveryTokens.accessToken || loading || success}
-            className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold transition"
-          >
-            {loading ? "Updating..." : "Update Password"}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading || success}
+              className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold transition"
+            >
+              {loading ? "Updating..." : "Update Password"}
+            </button>
+          </form>
+        ) : null}
+
+        {hasCheckedRecovery && (!recoveryTokens?.accessToken || linkError) && (
+          <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-700">
+            <p className="font-semibold">Invalid or expired reset link.</p>
+            <p className="text-sm">
+              {linkError ||
+                "Please request a new password reset email and try again."}
+            </p>
+          </div>
+        )}
 
         <Link
           href="/forgot-password"
