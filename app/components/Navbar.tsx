@@ -49,6 +49,7 @@ export default async function Navbar() {
                   <>
                     <Link href="/add-listing">Add Listing</Link>
                     <Link href="/my-listings">Manage Listings</Link>
+                    <Link href="/showing-requests">Showing Requests</Link>
                   </>
                 )}
               </div>
@@ -83,6 +84,7 @@ export default async function Navbar() {
                 <div className="flex flex-col gap-3 text-gray-700">
                   <Link href="/">Dashboard</Link>
                   <Link href="/my-listings">My Listings</Link>
+                  <Link href="/showing-requests">Showing Requests</Link>
                   <Link href="/add-listing">Add Listing</Link>
                   {canUseAdmin && <Link href="/admin">Admin Review</Link>}
                   <form action="/api/auth/logout" method="post">

@@ -168,6 +168,13 @@ export default function HomeContent({
                   Edit and Review
                 </Link>
 
+                <Link
+                  href="/showing-requests"
+                  className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
+                >
+                  Showing Requests
+                </Link>
+
                 {isAdmin && (
                   <Link
                     href="/admin"

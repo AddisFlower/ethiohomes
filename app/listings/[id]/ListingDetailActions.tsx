@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { FormEvent } from "react";
 import { useState } from "react";
 
 type ListingDetailActionsProps = {
@@ -15,6 +16,9 @@ export default function ListingDetailActions({
 }: ListingDetailActionsProps) {
   const router = useRouter();
   const [showingRequested, setShowingRequested] = useState(false);
+  const [showShowingForm, setShowShowingForm] = useState(false);
+  const [showingError, setShowingError] = useState("");
+  const [showingLoading, setShowingLoading] = useState(false);
   const [listingSaved, setListingSaved] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -46,6 +50,42 @@ export default function ListingDetailActions({
     }, 1200);
   }
 
+  async function handleShowingSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    setShowingError("");
+    setShowingLoading(true);
+
+    const response = await fetch("/api/showing-requests", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        listingId,
+        name: String(formData.get("name") ?? ""),
+        email: String(formData.get("email") ?? ""),
+        phone: String(formData.get("phone") ?? ""),
+        preferredDatetime: String(formData.get("preferredDatetime") ?? ""),
+        message: String(formData.get("message") ?? ""),
+      }),
+    });
+
+    setShowingLoading(false);
+
+    if (!response.ok) {
+      const result = await response.json();
+      setShowingError(result.error ?? "Please try again.");
+      return;
+    }
+
+    form.reset();
+    setShowingRequested(true);
+    setShowShowingForm(false);
+  }
+
   if (deleted) {
     return (
       <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-800">
@@ -61,9 +101,102 @@ export default function ListingDetailActions({
         <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-800">
           <p className="font-semibold">Showing request submitted.</p>
           <p className="text-sm">
-            The listing agent has been notified in this MVP flow.
+            The listing agent can now view this request in EthioMLS.
           </p>
         </div>
+      )}
+
+      {showingError && (
+        <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-700">
+          <p className="font-semibold">Showing request could not be submitted.</p>
+          <p className="text-sm">{showingError}</p>
+        </div>
+      )}
+
+      {showShowingForm && !isOwner && (
+        <form
+          onSubmit={handleShowingSubmit}
+          className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-black font-semibold mb-2">
+                Name
+              </label>
+              <input
+                name="name"
+                required
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
+                placeholder="Your name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-black font-semibold mb-2">
+                Email
+              </label>
+              <input
+                name="email"
+                type="email"
+                required
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
+                placeholder="you@example.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-black font-semibold mb-2">
+                Phone
+              </label>
+              <input
+                name="phone"
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
+                placeholder="Optional"
+              />
+            </div>
+
+            <div>
+              <label className="block text-black font-semibold mb-2">
+                Preferred Date/Time
+              </label>
+              <input
+                name="preferredDatetime"
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
+                placeholder="Optional, e.g. June 12 at 3 PM"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-black font-semibold mb-2">
+              Message
+            </label>
+            <textarea
+              name="message"
+              rows={4}
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
+              placeholder="Optional notes for the agent"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="submit"
+              disabled={showingLoading}
+              className="bg-emerald-700 hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 text-white px-6 py-3 rounded-lg font-semibold transition"
+            >
+              {showingLoading ? "Submitting..." : "Submit Request"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowShowingForm(false)}
+              className="border border-gray-300 hover:border-emerald-700 hover:text-emerald-700 text-black px-6 py-3 rounded-lg font-semibold transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       )}
 
       {listingSaved && (
@@ -109,7 +242,7 @@ export default function ListingDetailActions({
           <>
             <button
               type="button"
-              onClick={() => setShowingRequested(true)}
+              onClick={() => setShowShowingForm(true)}
               className="bg-emerald-700 hover:bg-emerald-800 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
             >
               Request Showing

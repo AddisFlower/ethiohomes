@@ -20,6 +20,7 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
   - `PUT /api/listings/[id]` updates listings.
   - `DELETE /api/listings/[id]` deletes listings.
   - `PUT /api/listings/[id]/photo` replaces a listing's primary photo.
+  - `POST /api/showing-requests` stores public showing requests/inquiries.
   - `PATCH /api/admin/listings/[id]/approval` approves or rejects listings through mocked admin access.
 - Reads are routed through `lib/listings.ts`:
   - Home promoted listings.
@@ -42,10 +43,12 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Ownership-based UI and edit/delete guards using Supabase Auth user IDs.
 - Non-owner request showing success state.
 - Non-owner save listing success state.
+- Public/non-owner showing requests persist to Supabase and can be reviewed by agents.
 - Owner-only primary photo management page.
 - Add Listing supports optional Supabase Storage image upload.
 - Supabase-backed admin approval workflow with mocked admin access.
 - Admin review supports Unapproved, Approved, Rejected, and All filters.
+- Agent/admin Showing Requests page for submitted listing inquiries, scoped to listings the signed-in user owns.
 - Rejections store a rejection reason.
 - Owners can edit rejected listings to resubmit them for review.
 - Edit Listing includes owner delete action.
@@ -142,10 +145,29 @@ Important columns:
 - `role text not null default 'agent'` - either `agent` or `admin`.
 - `created_at timestamptz`
 
+Table: `public.showing_requests`
+
+Important columns:
+- `id text primary key` - app-generated request identity.
+- `listing_id text not null` - internal listing ID.
+- `listing_title text not null` - title snapshot at request time.
+- `listing_mls_id text not null` - MLS ID snapshot at request time.
+- `agent_owner_id text not null` - owner ID for agent-scoped request inboxes.
+- `requester_name text not null`
+- `requester_email text not null`
+- `requester_phone text`
+- `preferred_datetime text`
+- `message text`
+- `status text not null default 'New'`
+- `created_at timestamptz`
+
 Indexes:
 - `owner_id`
 - `status`
 - `property_type`
+- `showing_requests.agent_owner_id`
+- `showing_requests.listing_id`
+- `showing_requests.created_at`
 
 Trigger:
 - Updates `updated_at` automatically before row updates.
@@ -177,6 +199,13 @@ Seed data:
 - Ownership rules:
   - Owners can edit/delete/manage photos.
   - Non-owners can request showings and save listings.
+- Showing requests:
+  - Public/non-owner visitors can submit name, email, optional phone, optional preferred date/time, and optional message from listing details.
+  - Requests store listing title and MLS ID snapshots plus `agent_owner_id`.
+  - Agents see requests for listings they own on `/showing-requests`.
+  - Admins do not get global showing request access; admins see only requests for listings they personally own.
+  - Showing requests are agent-owned lead data, not global admin moderation data.
+  - Email notifications are not implemented yet.
 - Admins can approve or reject listings through `/admin`.
 - Admins can filter and review Unapproved, Approved, Rejected, and All listings.
 - Admin rejection requires a reason.
@@ -210,7 +239,7 @@ Future client/buyer capabilities should be built on top of the `client` role:
 2. Convert `listings.owner_id` from text to uuid after demo rows are cleaned up.
 3. Replace hard delete with soft delete if listing recovery/audit history matters.
 4. Expand photo uploads into multi-photo galleries and ordering.
-5. Implement showing-request persistence and/or email notifications.
+5. Add email notifications for showing requests if needed.
 6. Replace demo navbar fallback routes with real Clients, Financial, Subscription, Billing, and Settings pages.
 7. Replace static dashboard metrics with real Supabase-derived counts.
 8. Update app metadata from default Next.js values.
@@ -224,7 +253,8 @@ Future client/buyer capabilities should be built on top of the `client` role:
 - Add Listing uses a fallback image when no primary image is uploaded.
 - Edit Listing still uses image URL; owner photo replacement is handled on `/listings/[id]/photos`.
 - Photo management supports one primary image only; galleries and ordering are future work.
-- Request Showing and Save Listing only show local success states.
+- Save Listing only shows a local success state.
+- Showing request status is currently always `New`; no follow-up workflow is implemented yet.
 - Admin access is mocked and should be replaced with real admin roles when auth is implemented.
 - `verified` remains a supporting database flag and should not be treated as the primary UI state.
 - Home dashboard metrics are static.
@@ -349,6 +379,26 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Expected: the replacement image appears everywhere.
 - Open `/listings/2/photos`.
 - Expected: access denied for a non-owned listing.
+
+### Showing Requests
+- Sign out and open an approved public listing detail page.
+- Click `Request Showing`.
+- Submit name and email with optional phone, preferred date/time, and message.
+- Expected: success message appears.
+- Check Supabase Table Editor.
+- Expected: `public.showing_requests` has a new row with listing ID, listing title, MLS ID, `agent_owner_id`, requester fields, `status = New`, and `created_at`.
+- Sign in as the listing owner.
+- Open `/showing-requests`.
+- Expected: the new request appears.
+- Sign in as a different agent.
+- Open `/showing-requests`.
+- Expected: requests for listings owned by other agents do not appear.
+- Sign in as an admin who does not own that listing.
+- Open `/showing-requests`.
+- Expected: the request does not appear.
+- Sign in as an admin who owns the listing.
+- Open `/showing-requests`.
+- Expected: the request appears.
 
 ### Admin Approval
 - Create or update a profile with `role = admin`.

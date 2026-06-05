@@ -30,6 +30,21 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.showing_requests (
+  id text primary key,
+  listing_id text not null,
+  listing_title text not null,
+  listing_mls_id text not null,
+  agent_owner_id text not null,
+  requester_name text not null,
+  requester_email text not null,
+  requester_phone text,
+  preferred_datetime text,
+  message text,
+  status text not null default 'New',
+  created_at timestamptz not null default now()
+);
+
 create sequence if not exists public.listing_id_seq
   as integer
   start with 1004
@@ -92,6 +107,9 @@ create index if not exists listings_status_idx on public.listings(status);
 create index if not exists listings_transaction_type_idx on public.listings(transaction_type);
 create index if not exists listings_market_status_idx on public.listings(market_status);
 create index if not exists listings_property_type_idx on public.listings(property_type);
+create index if not exists showing_requests_agent_owner_id_idx on public.showing_requests(agent_owner_id);
+create index if not exists showing_requests_listing_id_idx on public.showing_requests(listing_id);
+create index if not exists showing_requests_created_at_idx on public.showing_requests(created_at);
 
 create or replace function public.set_listings_updated_at()
 returns trigger as $$
