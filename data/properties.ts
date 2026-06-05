@@ -1,4 +1,6 @@
-export const properties = [
+import type { Property } from "@/lib/listings";
+
+export const properties: Property[] = [
   {
     id: "1",
     listingId: "MLS-1001",
@@ -7,12 +9,14 @@ export const properties = [
     location: "Addis Ababa, Bole",
     address: "Bole Rwanda Embassy Area, House No. B-214",
     propertyType: "Apartment",
-    status: "FOR SALE",
+    transactionType: "For Sale",
+    marketStatus: "Active",
     verified: true,
     bedrooms: 3,
     bathrooms: 2,
     agent: "Dawit Realty",
     updatedAt: "Updated 2 hours ago",
+    updatedAtTimestamp: null,
     approvalStatus: "Approved",
     rejectionReason: null,
     description:
@@ -28,14 +32,16 @@ export const properties = [
     price: "28,000,000 ETB",
     location: "Addis Ababa, Summit",
     address: "Summit Figa, near Safari Apartments, Villa 18",
-    status: "FOR RENT",
+    transactionType: "For Rent",
+    marketStatus: "Pending",
     verified: true,
     bedrooms: 5,
     bathrooms: 4,
     listingId: "MLS-1002",
     agent: "Habesha Properties",
     updatedAt: "Updated yesterday",
-    approvalStatus: "Pending",
+    updatedAtTimestamp: null,
+    approvalStatus: "Unapproved",
     rejectionReason: null,
     description:
       "Spacious luxury villa with modern architecture, large outdoor area, and premium finishes.",
@@ -50,13 +56,15 @@ export const properties = [
     price: "18,750,000 ETB",
     location: "Addis Ababa, CMC",
     address: "CMC Michael Road, behind Tsehay Real Estate, House 42",
-    status: "FOR SALE",
+    transactionType: "For Sale",
+    marketStatus: "Active",
     verified: false,
     bedrooms: 4,
     bathrooms: 3,
     listingId: "MLS-1003",
     agent: "Ethio Land Brokers",
     updatedAt: "Updated 3 days ago",
+    updatedAtTimestamp: null,
     approvalStatus: "Rejected",
     rejectionReason:
       "Please add clearer exterior photos and confirm the property address.",

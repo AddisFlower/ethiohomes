@@ -257,12 +257,16 @@ export default function HomeContent({
                 <div className="flex gap-2 mb-3">
                   <span
                     className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                      property.status === "FOR SALE"
+                      property.transactionType === "For Sale"
                         ? "bg-green-100 text-green-700"
                         : "bg-blue-100 text-blue-700"
                     }`}
                   >
-                    {property.status}
+                    {property.transactionType}
+                  </span>
+
+                  <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">
+                    {property.marketStatus}
                   </span>
 
                 </div>
@@ -290,8 +294,8 @@ export default function HomeContent({
                   </p>
 
                   <p>
-                    <span className="font-semibold text-black">Status:</span>{" "}
-                    {property.approvalStatus}
+                    <span className="font-semibold text-black">Market:</span>{" "}
+                    {property.marketStatus}
                   </p>
 
                   <p className="text-xs text-gray-500">{property.updatedAt}</p>

@@ -74,7 +74,11 @@ export default async function MyListingsPage() {
 
                 <div className="flex flex-wrap gap-2 mb-4">
                   <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
-                    {property.status}
+                    {property.transactionType}
+                  </span>
+
+                  <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold">
+                    {property.marketStatus}
                   </span>
 
                   <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">

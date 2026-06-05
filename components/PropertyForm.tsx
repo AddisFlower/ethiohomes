@@ -9,7 +9,8 @@ export type PropertyFormDefaultValues = {
   city?: string;
   address?: string;
   propertyType?: string;
-  listingType?: string;
+  transactionType?: string;
+  marketStatus?: string;
   bedrooms?: string | number;
   bathrooms?: string | number;
   description?: string;
@@ -20,16 +21,21 @@ type PropertyFormProps = {
   actionSlot?: ReactNode;
   mode: "create" | "edit";
   defaultValues?: PropertyFormDefaultValues;
+  disabled?: boolean;
   onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
+  submitLabel?: string;
 };
 
 export default function PropertyForm({
   actionSlot,
   mode,
   defaultValues,
+  disabled = false,
   onSubmit,
+  submitLabel,
 }: PropertyFormProps) {
   const isEditMode = mode === "edit";
+  const defaultSubmitLabel = isEditMode ? "Save Listing" : "Submit Listing";
 
   return (
     <form
@@ -129,17 +135,36 @@ export default function PropertyForm({
 
       <div>
         <label className="block text-black font-semibold mb-2">
-          Listing Type
+          Transaction Type
         </label>
 
         <select
-          name="listingType"
+          name="transactionType"
           required
-          defaultValue={defaultValues?.listingType ?? "FOR SALE"}
+          defaultValue={defaultValues?.transactionType ?? "For Sale"}
           className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
         >
-          <option>FOR SALE</option>
-          <option>FOR RENT</option>
+          <option>For Sale</option>
+          <option>For Rent</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-black font-semibold mb-2">
+          Market Status
+        </label>
+
+        <select
+          name="marketStatus"
+          required
+          defaultValue={defaultValues?.marketStatus ?? "Active"}
+          className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
+        >
+          <option>Coming Soon</option>
+          <option>Active</option>
+          <option>Pending</option>
+          <option>Closed</option>
+          <option>Off Market</option>
         </select>
       </div>
 
@@ -236,9 +261,10 @@ export default function PropertyForm({
       >
         <button
           type="submit"
-          className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3 rounded-lg font-semibold transition"
+          disabled={disabled}
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 text-white py-3 rounded-lg font-semibold transition"
         >
-          {isEditMode ? "Save Listing" : "Submit Listing"}
+          {submitLabel ?? defaultSubmitLabel}
         </button>
 
         {actionSlot}

@@ -6,13 +6,14 @@ create table if not exists public.listings (
   location text not null,
   address text,
   property_type text not null,
-  status text not null,
+  status text not null default 'For Sale',
+  transaction_type text not null default 'For Sale',
+  market_status text not null default 'Active',
   verified boolean not null default false,
   bedrooms integer not null,
   bathrooms integer not null,
   agent text not null,
-  updated_at_label text not null,
-  approval_status text not null,
+  approval_status text not null default 'Unapproved',
   rejection_reason text,
   description text not null,
   image text not null,
@@ -51,8 +52,45 @@ add column if not exists rejection_reason text;
 alter table public.listings
 add column if not exists address text;
 
+alter table public.listings
+add column if not exists transaction_type text not null default 'For Sale';
+
+alter table public.listings
+add column if not exists market_status text not null default 'Active';
+
+alter table public.listings
+alter column status set default 'For Sale';
+
+alter table public.listings
+alter column approval_status set default 'Unapproved';
+
+update public.listings
+set transaction_type = case
+  when status in ('FOR RENT', 'For Rent') then 'For Rent'
+  else 'For Sale'
+end
+where transaction_type is null
+  or transaction_type not in ('For Sale', 'For Rent');
+
+update public.listings
+set market_status = 'Active'
+where market_status is null
+  or market_status not in (
+    'Coming Soon',
+    'Active',
+    'Pending',
+    'Closed',
+    'Off Market'
+  );
+
+update public.listings
+set approval_status = 'Unapproved'
+where approval_status = 'Pending';
+
 create index if not exists listings_owner_id_idx on public.listings(owner_id);
 create index if not exists listings_status_idx on public.listings(status);
+create index if not exists listings_transaction_type_idx on public.listings(transaction_type);
+create index if not exists listings_market_status_idx on public.listings(market_status);
 create index if not exists listings_property_type_idx on public.listings(property_type);
 
 create or replace function public.set_listings_updated_at()
@@ -79,11 +117,12 @@ insert into public.listings (
   address,
   property_type,
   status,
+  transaction_type,
+  market_status,
   verified,
   bedrooms,
   bathrooms,
   agent,
-  updated_at_label,
   approval_status,
   rejection_reason,
   description,
@@ -98,12 +137,13 @@ insert into public.listings (
     'Addis Ababa, Bole',
     'Bole Rwanda Embassy Area, House No. B-214',
     'Apartment',
-    'FOR SALE',
+    'For Sale',
+    'For Sale',
+    'Active',
     true,
     3,
     2,
     'Dawit Realty',
-    'Updated 2 hours ago',
     'Approved',
     null,
     'Beautiful modern apartment located in the heart of Bole near restaurants, shopping centers, and schools.',
@@ -118,13 +158,14 @@ insert into public.listings (
     'Addis Ababa, Summit',
     'Summit Figa, near Safari Apartments, Villa 18',
     'Villa',
-    'FOR RENT',
+    'For Rent',
+    'For Rent',
+    'Pending',
     true,
     5,
     4,
     'Habesha Properties',
-    'Updated yesterday',
-    'Pending',
+    'Unapproved',
     null,
     'Spacious luxury villa with modern architecture, large outdoor area, and premium finishes.',
     'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1200&auto=format&fit=crop',
@@ -138,12 +179,13 @@ insert into public.listings (
     'Addis Ababa, CMC',
     'CMC Michael Road, behind Tsehay Real Estate, House 42',
     'House',
-    'FOR SALE',
+    'For Sale',
+    'For Sale',
+    'Active',
     false,
     4,
     3,
     'Ethio Land Brokers',
-    'Updated 3 days ago',
     'Rejected',
     'Please add clearer exterior photos and confirm the property address.',
     'Perfect family home in a quiet neighborhood with easy access to schools and shopping.',
@@ -158,11 +200,12 @@ on conflict (id) do update set
   address = excluded.address,
   property_type = excluded.property_type,
   status = excluded.status,
+  transaction_type = excluded.transaction_type,
+  market_status = excluded.market_status,
   verified = excluded.verified,
   bedrooms = excluded.bedrooms,
   bathrooms = excluded.bathrooms,
   agent = excluded.agent,
-  updated_at_label = excluded.updated_at_label,
   approval_status = excluded.approval_status,
   rejection_reason = excluded.rejection_reason,
   description = excluded.description,

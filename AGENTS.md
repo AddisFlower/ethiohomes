@@ -9,7 +9,7 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Shared listing form lives in `components/PropertyForm.tsx`.
 - Listing persistence is now backed by Supabase/Postgres through server-side REST helpers:
   - `lib/supabase.ts` builds Supabase REST and Storage requests from environment variables.
-  - `lib/listings.ts` maps Supabase rows to the existing app-facing `Property` shape.
+  - `lib/listings.ts` maps Supabase rows to the existing app-facing `Property` shape and formats display labels from real timestamp fields.
 - API routes handle writes:
   - `POST /api/auth/signup` creates Supabase Auth users and agent profiles.
   - `POST /api/auth/login` signs users in with Supabase email/password auth.
@@ -45,7 +45,7 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Owner-only primary photo management page.
 - Add Listing supports optional Supabase Storage image upload.
 - Supabase-backed admin approval workflow with mocked admin access.
-- Admin review supports Pending, Approved, Rejected, and All filters.
+- Admin review supports Unapproved, Approved, Rejected, and All filters.
 - Rejections store a rejection reason.
 - Owners can edit rejected listings to resubmit them for review.
 - Edit Listing includes owner delete action.
@@ -55,6 +55,7 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Friendly auth errors and improved auth-page spacing.
 - Demo-polished navbar fallback routes for deferred pages.
 - Styled not-found and access-denied states.
+- Last Updated display now uses the database-owned `updated_at` timestamp instead of storing generated display text.
 
 ## Supabase Integration Status
 - Supabase/Postgres is the active persistence layer for listings.
@@ -71,6 +72,8 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Admins inherit normal agent capabilities and also access `/admin`.
 - Supabase Auth uses email/password login for the MVP.
 - Password recovery uses `/forgot-password` and `/reset-password`.
+- `updated_at` is the only source of truth for Last Updated UI labels. Any legacy `updated_at_label` column should be ignored by app code.
+- Listing status is split into `approval_status`, `market_status`, and `transaction_type`.
 
 ## Environment Variables Required
 Set these locally in `.env.local` and in Vercel project settings:
@@ -115,19 +118,20 @@ Important columns:
 - `location text not null`
 - `address text` - street/property address, separate from city/neighborhood location.
 - `property_type text not null`
-- `status text not null`
+- `status text not null` - legacy transaction-type field kept temporarily for migration safety; app code ignores it.
+- `transaction_type text not null` - either `For Sale` or `For Rent`.
+- `market_status text not null` - `Coming Soon`, `Active`, `Pending`, `Closed`, or `Off Market`.
 - `verified boolean not null default false`
 - `bedrooms integer not null`
 - `bathrooms integer not null`
 - `agent text not null`
-- `updated_at_label text not null`
-- `approval_status text not null`
+- `approval_status text not null` - `Unapproved`, `Approved`, or `Rejected`.
 - `rejection_reason text`
 - `description text not null`
 - `image text not null`
 - `owner_id text not null`
 - `created_at timestamptz`
-- `updated_at timestamptz`
+- `updated_at timestamptz` - source of truth for Last Updated displays.
 
 Table: `public.profiles`
 
@@ -145,6 +149,7 @@ Indexes:
 
 Trigger:
 - Updates `updated_at` automatically before row updates.
+- App code should format user-facing Last Updated labels from `updated_at`.
 
 Seed data:
 - `MLS-1001`, owner `agent-1`
@@ -164,6 +169,7 @@ Seed data:
 
 ## Authentication and Ownership
 - Authentication uses Supabase email/password auth.
+- Current roles are `public`, `agent`, and `admin`.
 - Public users can browse public listing pages and sign in.
 - Agents can add listings, view My Listings, edit/delete owned listings, and manage owned listing photos.
 - Admins inherit agent capabilities and can also access `/admin`.
@@ -172,12 +178,32 @@ Seed data:
   - Owners can edit/delete/manage photos.
   - Non-owners can request showings and save listings.
 - Admins can approve or reject listings through `/admin`.
-- Admins can filter and review Pending, Approved, Rejected, and All listings.
+- Admins can filter and review Unapproved, Approved, Rejected, and All listings.
 - Admin rejection requires a reason.
-- Editing a rejected listing resubmits it by setting `approval_status = Pending` and clearing `rejection_reason`.
+- Editing a rejected listing resubmits it by setting `approval_status = Unapproved` and clearing `rejection_reason`.
+- Public browse/detail shows only `approval_status = Approved` listings with `market_status` in `Coming Soon`, `Active`, `Pending`, or `Closed`.
+- Public browse/detail hides Unapproved listings, Rejected listings, and Off Market listings.
+- Closed listings remain publicly visible.
+- More market statuses may be added later depending on agent, admin, and client feedback.
 - `owner_id` remains `text` for now so old seeded `agent-1`/`agent-2` demo rows can coexist with new Supabase Auth UUID owner IDs.
 - TODO: Convert `owner_id` to `uuid references auth.users(id)` once test/demo rows are cleaned up.
 - TODO: Add RLS policies after auth behavior is stable.
+
+## Future Role Model
+Planned roles:
+- `public` - unauthenticated visitor.
+- `client` - authenticated buyer/renter.
+- `agent` - listing owner and agent workspace user.
+- `admin` - review/moderation user that inherits agent capabilities.
+
+Do not implement client accounts until explicitly requested. When added, the `client` role should be represented in `public.profiles.role` and should not share listing ownership semantics with agents. `listings.owner_id` should continue to mean the agent/admin owner of a listing.
+
+Future client/buyer capabilities should be built on top of the `client` role:
+- Favorites or saved listings.
+- Listing inquiries.
+- Showing requests.
+- Search preferences and alerts.
+- Client-facing saved search or dashboard views.
 
 ## Remaining MVP Tasks Ranked by Priority
 1. Add Row Level Security policies after auth exists.
@@ -204,6 +230,8 @@ Seed data:
 - Home dashboard metrics are static.
 - No automated tests exist yet.
 - Auth helpers currently fall back gracefully if `public.profiles` is missing, but the `profiles` table should still be created in Supabase for normal operation.
+- If an existing database still has a legacy `updated_at_label` column, app code ignores it. Do not read from it or write to it.
+- The old `listings.status` column remains only as a temporary migration-safety field. New application behavior uses `transaction_type` and `market_status`.
 
 ## TODO/Future Enhancement: Address Normalization
 Current MVP approach:
@@ -272,7 +300,7 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Refresh `/my-listings`.
 - Expected: new listing remains.
 - Check Supabase Table Editor.
-- Expected: new row has `owner_id` equal to the authenticated Supabase user ID, `approval_status = Pending`, `verified = false`, and short `listing_id` like `MLS-1004`.
+- Expected: new row has `owner_id` equal to the authenticated Supabase user ID, `approval_status = Unapproved`, `transaction_type = For Sale`, `market_status = Active`, `verified = false`, and short `listing_id` like `MLS-1004`.
 - Expected: new row has `location` as city/neighborhood and `address` as the specific property address.
 - Expected: new row has an `image` URL from the `listing-images` Supabase Storage bucket.
 - Open the listing detail page.
@@ -286,7 +314,7 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Expected: success message appears.
 - Open the listing detail page and refresh.
 - Expected: edited values persist.
-- If the listing was rejected, expected: `approval_status = Pending` and `rejection_reason = null`.
+- If the listing was rejected, expected: `approval_status = Unapproved` and `rejection_reason = null`.
 
 ### Delete
 - Open an owned listing detail page.
@@ -327,11 +355,11 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Sign in as that admin user.
 - Open `/admin`.
 - Expected: pending listings from Supabase appear with photo, MLS ID, title, price, location, agent, and approval status.
-- Use the filter buttons for Pending, Approved, Rejected, and All.
+- Use the filter buttons for Unapproved, Approved, Rejected, and All.
 - Expected: each filter shows matching listings.
 - Create a new listing from `/add-listing`.
 - Open `/admin`.
-- Expected: the new listing appears as `Pending`.
+- Expected: the new listing appears as `Unapproved`.
 - Click `Approve`.
 - Expected: listing disappears from the pending queue.
 - Check Supabase Table Editor.
@@ -342,8 +370,8 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Open `/my-listings` as the owner of a rejected listing.
 - Expected: rejection reason is visible.
 - Edit the rejected listing and save.
-- Expected: listing is resubmitted with `approval_status = Pending` and `rejection_reason = null`.
-- Create or reset another listing to `Pending`.
+- Expected: listing is resubmitted with `approval_status = Unapproved` and `rejection_reason = null`.
+- Create or reset another listing to `Unapproved`.
 - Click `Reject`.
 - Expected: listing disappears from the pending queue.
 - Check Supabase Table Editor.

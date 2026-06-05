@@ -13,13 +13,15 @@ export type Property = {
   location: string;
   address: string | null;
   propertyType: string;
-  status: string;
+  transactionType: TransactionType;
+  marketStatus: MarketStatus;
   verified: boolean;
   bedrooms: number;
   bathrooms: number;
   agent: string;
   updatedAt: string;
-  approvalStatus: string;
+  updatedAtTimestamp: string | null;
+  approvalStatus: ApprovalStatus;
   rejectionReason: string | null;
   description: string;
   image: string;
@@ -34,12 +36,13 @@ type ListingRow = {
   location: string;
   address: string | null;
   property_type: string;
-  status: string;
+  transaction_type: string | null;
+  market_status: string | null;
   verified: boolean;
   bedrooms: number;
   bathrooms: number;
   agent: string;
-  updated_at_label: string;
+  updated_at: string | null;
   approval_status: string;
   rejection_reason: string | null;
   description: string;
@@ -51,9 +54,110 @@ type ListingOwnerRow = {
   owner_id: string;
 };
 
+export type ApprovalStatus = "Unapproved" | "Approved" | "Rejected";
+export type MarketStatus =
+  | "Coming Soon"
+  | "Active"
+  | "Pending"
+  | "Closed"
+  | "Off Market";
+export type TransactionType = "For Sale" | "For Rent";
+
 const fallbackImage =
   "https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1200&auto=format&fit=crop";
 const listingImagesBucket = "listing-images";
+const publicMarketStatuses: MarketStatus[] = [
+  "Coming Soon",
+  "Active",
+  "Pending",
+  "Closed",
+];
+
+function toMarketStatus(value: string | null | undefined): MarketStatus {
+  if (
+    value === "Coming Soon" ||
+    value === "Active" ||
+    value === "Pending" ||
+    value === "Closed" ||
+    value === "Off Market"
+  ) {
+    return value;
+  }
+
+  return "Active";
+}
+
+function toTransactionType(
+  value: string | null | undefined
+): TransactionType {
+  if (value === "For Rent" || value === "FOR RENT") {
+    return "For Rent";
+  }
+
+  return "For Sale";
+}
+
+export function isPubliclyVisibleListing(listing: {
+  approvalStatus: string;
+  marketStatus: string;
+}) {
+  return (
+    listing.approvalStatus === "Approved" &&
+    publicMarketStatuses.includes(listing.marketStatus as MarketStatus)
+  );
+}
+
+function formatUpdatedAt(updatedAt: string | null) {
+  if (!updatedAt) {
+    return "Updated date unavailable";
+  }
+
+  const timestamp = new Date(updatedAt).getTime();
+
+  if (Number.isNaN(timestamp)) {
+    return "Updated date unavailable";
+  }
+
+  const elapsedSeconds = Math.max(
+    0,
+    Math.floor((Date.now() - timestamp) / 1000)
+  );
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  const elapsedDays = Math.floor(elapsedHours / 24);
+
+  if (elapsedSeconds < 60) {
+    return "Updated just now";
+  }
+
+  if (elapsedMinutes < 60) {
+    return `Updated ${elapsedMinutes} minute${elapsedMinutes === 1 ? "" : "s"} ago`;
+  }
+
+  if (elapsedHours < 24) {
+    return `Updated ${elapsedHours} hour${elapsedHours === 1 ? "" : "s"} ago`;
+  }
+
+  if (elapsedDays === 1) {
+    return "Updated yesterday";
+  }
+
+  if (elapsedDays < 7) {
+    return `Updated ${elapsedDays} days ago`;
+  }
+
+  const date = new Date(timestamp);
+  const options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+  };
+
+  if (new Date().getFullYear() !== date.getFullYear()) {
+    options.year = "numeric";
+  }
+
+  return `Updated ${new Intl.DateTimeFormat("en-US", options).format(date)}`;
+}
 
 function toProperty(row: ListingRow): Property {
   return {
@@ -64,18 +168,28 @@ function toProperty(row: ListingRow): Property {
     location: row.location,
     address: row.address,
     propertyType: row.property_type,
-    status: row.status,
+    transactionType: toTransactionType(row.transaction_type),
+    marketStatus: toMarketStatus(row.market_status),
     verified: row.verified,
     bedrooms: row.bedrooms,
     bathrooms: row.bathrooms,
     agent: row.agent,
-    updatedAt: row.updated_at_label,
-    approvalStatus: row.approval_status,
+    updatedAt: formatUpdatedAt(row.updated_at),
+    updatedAtTimestamp: row.updated_at,
+    approvalStatus: toApprovalStatus(row.approval_status),
     rejectionReason: row.rejection_reason,
     description: row.description,
     image: row.image,
     ownerId: row.owner_id,
   };
+}
+
+function toApprovalStatus(value: string): ApprovalStatus {
+  if (value === "Approved" || value === "Rejected") {
+    return value;
+  }
+
+  return "Unapproved";
 }
 
 function fromFormData(formData: FormData, imageUrl?: string) {
@@ -90,12 +204,12 @@ function fromFormData(formData: FormData, imageUrl?: string) {
     location: city,
     address: String(formData.get("address") ?? ""),
     property_type: String(formData.get("propertyType") ?? "Apartment"),
-    status: String(formData.get("listingType") ?? "FOR SALE"),
+    transaction_type: String(formData.get("transactionType") ?? "For Sale"),
+    market_status: String(formData.get("marketStatus") ?? "Active"),
     bedrooms: Number(formData.get("bedrooms") ?? 0),
     bathrooms: Number(formData.get("bathrooms") ?? 0),
     description: String(formData.get("description") ?? ""),
     image,
-    updated_at_label: "Updated just now",
   };
 }
 
@@ -149,12 +263,12 @@ async function assertListingOwner(id: string, ownerId: string) {
 export async function getListings(): Promise<Property[]> {
   try {
     const rows = await supabaseRequest<ListingRow[]>(
-      "/listings?select=*&order=id.asc"
+      "/listings?select=*&approval_status=eq.Approved&order=id.asc"
     );
 
-    return rows.map(toProperty);
+    return rows.map(toProperty).filter(isPubliclyVisibleListing);
   } catch {
-    return mockProperties;
+    return mockProperties.filter(isPubliclyVisibleListing);
   }
 }
 
@@ -184,12 +298,12 @@ export async function getListingsByOwner(ownerId: string): Promise<Property[]> {
 
 export type AdminListingStatusFilter =
   | "All"
-  | "Pending"
+  | "Unapproved"
   | "Approved"
   | "Rejected";
 
 export async function getAdminListings(
-  status: AdminListingStatusFilter = "Pending"
+  status: AdminListingStatusFilter = "Unapproved"
 ): Promise<Property[]> {
   const statusFilter =
     status === "All"
@@ -214,7 +328,7 @@ export async function createListing(
     id,
     verified: false,
     agent: agentName,
-    approval_status: "Pending",
+    approval_status: "Unapproved",
     owner_id: ownerId,
   };
 
@@ -251,7 +365,6 @@ export async function updateListingApproval(
         approval_status: approvalStatus,
         verified: approvalStatus === "Approved",
         rejection_reason: approvalStatus === "Rejected" ? reason : null,
-        updated_at_label: "Updated just now",
       }),
     }
   );
@@ -287,7 +400,6 @@ export async function updateListingPhoto(
       },
       body: JSON.stringify({
         image: imageUrl,
-        updated_at_label: "Updated just now",
       }),
     }
   );
@@ -320,7 +432,7 @@ export async function updateListing(
     ...fromFormData(formData),
     ...(existingRows[0].approval_status === "Rejected"
       ? {
-          approval_status: "Pending",
+          approval_status: "Unapproved",
           verified: false,
           rejection_reason: null,
         }

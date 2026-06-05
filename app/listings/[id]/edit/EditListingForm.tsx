@@ -73,7 +73,7 @@ export default function EditListingForm({
           </p>
           <p className="text-sm mb-4">
             {isRejected
-              ? "Status: Pending. The rejection reason has been cleared."
+              ? "Status: Unapproved. The rejection reason has been cleared."
               : "Your listing changes have been saved."}
           </p>
 

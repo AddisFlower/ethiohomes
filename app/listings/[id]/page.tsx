@@ -1,5 +1,9 @@
-import { getListingById } from "@/lib/listings";
-import { canManageListing, getAppSession } from "@/lib/auth";
+import { getListingById, isPubliclyVisibleListing } from "@/lib/listings";
+import {
+  canManageListing,
+  canUseAdminFeatures,
+  getAppSession,
+} from "@/lib/auth";
 import ListingDetailActions from "./ListingDetailActions";
 
 export default async function PropertyDetails({
@@ -12,8 +16,13 @@ export default async function PropertyDetails({
   const property = await getListingById(id);
   const session = await getAppSession();
   const isOwner = property ? canManageListing(session, property) : false;
+  const canViewListing =
+    property &&
+    (isPubliclyVisibleListing(property) ||
+      isOwner ||
+      canUseAdminFeatures(session));
 
-  if (!property) {
+  if (!property || !canViewListing) {
     return (
       <main className="min-h-screen bg-gray-100 py-12 px-6">
         <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
@@ -58,7 +67,11 @@ export default async function PropertyDetails({
 
         <div className="flex flex-wrap gap-2 mb-6">
           <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-semibold">
-            {property.status}
+            {property.transactionType}
+          </span>
+
+          <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">
+            {property.marketStatus}
           </span>
 
           <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
@@ -104,7 +117,7 @@ export default async function PropertyDetails({
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-5 mb-8 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="bg-white rounded-xl shadow-md p-5 mb-8 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
           <div>
             <p className="text-gray-500">Bedrooms</p>
             <p className="font-semibold text-black">
@@ -129,7 +142,14 @@ export default async function PropertyDetails({
           <div>
             <p className="text-gray-500">Listing Type</p>
             <p className="font-semibold text-black">
-              {property.status}
+              {property.transactionType}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-gray-500">Market Status</p>
+            <p className="font-semibold text-black">
+              {property.marketStatus}
             </p>
           </div>
         </div>

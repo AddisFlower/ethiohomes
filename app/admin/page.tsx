@@ -7,7 +7,7 @@ import {
 import AdminApprovalActions from "./AdminApprovalActions";
 
 const statusFilters: AdminListingStatusFilter[] = [
-  "Pending",
+  "Unapproved",
   "Approved",
   "Rejected",
   "All",
@@ -17,7 +17,7 @@ function getStatusFilter(value: string | string[] | undefined) {
   const status = Array.isArray(value) ? value[0] : value;
 
   if (
-    status === "Pending" ||
+    status === "Unapproved" ||
     status === "Approved" ||
     status === "Rejected" ||
     status === "All"
@@ -25,7 +25,7 @@ function getStatusFilter(value: string | string[] | undefined) {
     return status;
   }
 
-  return "Pending";
+  return "Unapproved";
 }
 
 function getApprovalClass(status: string) {
@@ -35,6 +35,22 @@ function getApprovalClass(status: string) {
 
   if (status === "Rejected") {
     return "bg-red-100 text-red-700";
+  }
+
+  return "bg-yellow-100 text-yellow-800";
+}
+
+function getMarketClass(status: string) {
+  if (status === "Active") {
+    return "bg-emerald-100 text-emerald-700";
+  }
+
+  if (status === "Off Market") {
+    return "bg-gray-200 text-gray-700";
+  }
+
+  if (status === "Closed") {
+    return "bg-blue-100 text-blue-700";
   }
 
   return "bg-yellow-100 text-yellow-800";
@@ -128,6 +144,18 @@ export default async function AdminPage({
 
                             <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold">
                               {listing.listingId}
+                            </span>
+
+                            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
+                              {listing.transactionType}
+                            </span>
+
+                            <span
+                              className={`${getMarketClass(
+                                listing.marketStatus
+                              )} px-3 py-1 rounded-full text-sm font-semibold`}
+                            >
+                              {listing.marketStatus}
                             </span>
                           </div>
 

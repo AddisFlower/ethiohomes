@@ -6,18 +6,20 @@ import { useSearchParams } from "next/navigation";
 import type { Property } from "@/lib/listings";
 
 type ListingsContentProps = {
+  currentUserId: string | null;
   properties: Property[];
 };
 
-export default function ListingsContent({ properties }: ListingsContentProps) {
-  // TODO: Replace this mock agent ID with the authenticated user's ID
-  // once login/auth is implemented.
-  const currentAgentId = "agent-1";
+export default function ListingsContent({
+  currentUserId,
+  properties,
+}: ListingsContentProps) {
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(
     () => searchParams.get("search") ?? ""
   );
-  const [listingStatus, setListingStatus] = useState("ALL");
+  const [transactionType, setTransactionType] = useState("ALL");
+  const [marketStatus, setMarketStatus] = useState("ALL");
   const [propertyType, setPropertyType] = useState("ALL");
 
   const filteredProperties = properties.filter((property) => {
@@ -27,13 +29,21 @@ export default function ListingsContent({ properties }: ListingsContentProps) {
       property.title.toLowerCase().includes(search) ||
       property.location.toLowerCase().includes(search);
 
-    const matchesStatus =
-      listingStatus === "ALL" || property.status === listingStatus;
+    const matchesTransactionType =
+      transactionType === "ALL" || property.transactionType === transactionType;
+
+    const matchesMarketStatus =
+      marketStatus === "ALL" || property.marketStatus === marketStatus;
 
     const matchesPropertyType =
       propertyType === "ALL" || property.propertyType === propertyType;
 
-    return matchesSearch && matchesStatus && matchesPropertyType;
+    return (
+      matchesSearch &&
+      matchesTransactionType &&
+      matchesMarketStatus &&
+      matchesPropertyType
+    );
   });
 
   return (
@@ -56,13 +66,25 @@ export default function ListingsContent({ properties }: ListingsContentProps) {
         />
 
         <select
-          value={listingStatus}
-          onChange={(e) => setListingStatus(e.target.value)}
+          value={transactionType}
+          onChange={(e) => setTransactionType(e.target.value)}
           className="bg-white text-black px-4 py-3 rounded-lg border border-gray-300 mb-8 ml-4"
         >
           <option value="ALL">All Listings</option>
-          <option value="FOR SALE">For Sale</option>
-          <option value="FOR RENT">For Rent</option>
+          <option value="For Sale">For Sale</option>
+          <option value="For Rent">For Rent</option>
+        </select>
+
+        <select
+          value={marketStatus}
+          onChange={(e) => setMarketStatus(e.target.value)}
+          className="bg-white text-black px-4 py-3 rounded-lg border border-gray-300 mb-8 ml-4"
+        >
+          <option value="ALL">All Market Statuses</option>
+          <option value="Coming Soon">Coming Soon</option>
+          <option value="Active">Active</option>
+          <option value="Pending">Pending</option>
+          <option value="Closed">Closed</option>
         </select>
 
         <select
@@ -78,7 +100,7 @@ export default function ListingsContent({ properties }: ListingsContentProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {filteredProperties.map((property) => {
-            const isOwner = property.ownerId === currentAgentId;
+            const isOwner = currentUserId === property.ownerId;
 
             return (
               <div
@@ -104,7 +126,11 @@ export default function ListingsContent({ properties }: ListingsContentProps) {
 
                   <div className="flex flex-wrap gap-2 mb-4">
                     <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
-                      {property.status}
+                      {property.transactionType}
+                    </span>
+
+                    <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold">
+                      {property.marketStatus}
                     </span>
 
                     <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">
@@ -159,7 +185,8 @@ export default function ListingsContent({ properties }: ListingsContentProps) {
               type="button"
               onClick={() => {
                 setSearchTerm("");
-                setListingStatus("ALL");
+                setTransactionType("ALL");
+                setMarketStatus("ALL");
                 setPropertyType("ALL");
               }}
               className="bg-emerald-700 hover:bg-emerald-800 text-white px-6 py-3 rounded-lg font-semibold transition"
