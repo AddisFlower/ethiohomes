@@ -59,7 +59,7 @@ export default function LoginForm({ initialMode }: LoginFormProps) {
       return;
     }
 
-    router.push("/my-listings");
+    router.push("/");
     router.refresh();
   }
 

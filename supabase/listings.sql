@@ -10,8 +10,8 @@ create table if not exists public.listings (
   transaction_type text not null default 'For Sale',
   market_status text not null default 'Active',
   verified boolean not null default false,
-  bedrooms integer not null,
-  bathrooms integer not null,
+  bedrooms integer,
+  bathrooms integer,
   agent text not null,
   approval_status text not null default 'Unapproved',
   rejection_reason text,
@@ -68,10 +68,10 @@ alter table public.listings
 add column if not exists address text;
 
 alter table public.listings
-add column if not exists transaction_type text not null default 'For Sale';
+add column if not exists transaction_type text;
 
 alter table public.listings
-add column if not exists market_status text not null default 'Active';
+add column if not exists market_status text;
 
 alter table public.listings
 alter column status set default 'For Sale';
@@ -81,7 +81,7 @@ alter column approval_status set default 'Unapproved';
 
 update public.listings
 set transaction_type = case
-  when status in ('FOR RENT', 'For Rent') then 'For Rent'
+  when upper(status) = 'FOR RENT' then 'For Rent'
   else 'For Sale'
 end
 where transaction_type is null
@@ -101,6 +101,74 @@ where market_status is null
 update public.listings
 set approval_status = 'Unapproved'
 where approval_status = 'Pending';
+
+update public.listings
+set approval_status = 'Unapproved'
+where approval_status is null
+  or approval_status not in ('Unapproved', 'Approved', 'Rejected');
+
+alter table public.listings
+alter column transaction_type set default 'For Sale';
+
+alter table public.listings
+alter column transaction_type set not null;
+
+alter table public.listings
+alter column market_status set default 'Active';
+
+alter table public.listings
+alter column market_status set not null;
+
+alter table public.listings
+alter column bedrooms drop not null;
+
+alter table public.listings
+alter column bathrooms drop not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'listings_transaction_type_check'
+      and conrelid = 'public.listings'::regclass
+  ) then
+    alter table public.listings
+    add constraint listings_transaction_type_check
+    check (transaction_type in ('For Sale', 'For Rent'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'listings_market_status_check'
+      and conrelid = 'public.listings'::regclass
+  ) then
+    alter table public.listings
+    add constraint listings_market_status_check
+    check (
+      market_status in (
+        'Coming Soon',
+        'Active',
+        'Pending',
+        'Closed',
+        'Off Market'
+      )
+    );
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'listings_approval_status_check'
+      and conrelid = 'public.listings'::regclass
+  ) then
+    alter table public.listings
+    add constraint listings_approval_status_check
+    check (approval_status in ('Unapproved', 'Approved', 'Rejected'));
+  end if;
+end;
+$$;
 
 create index if not exists listings_owner_id_idx on public.listings(owner_id);
 create index if not exists listings_status_idx on public.listings(status);
@@ -210,25 +278,7 @@ insert into public.listings (
     'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200&auto=format&fit=crop',
     'agent-1'
   )
-on conflict (id) do update set
-  listing_id = excluded.listing_id,
-  title = excluded.title,
-  price = excluded.price,
-  location = excluded.location,
-  address = excluded.address,
-  property_type = excluded.property_type,
-  status = excluded.status,
-  transaction_type = excluded.transaction_type,
-  market_status = excluded.market_status,
-  verified = excluded.verified,
-  bedrooms = excluded.bedrooms,
-  bathrooms = excluded.bathrooms,
-  agent = excluded.agent,
-  approval_status = excluded.approval_status,
-  rejection_reason = excluded.rejection_reason,
-  description = excluded.description,
-  image = excluded.image,
-  owner_id = excluded.owner_id;
+on conflict (id) do nothing;
 
 select setval(
   'public.listing_id_seq',

@@ -23,6 +23,7 @@ export default function EditListingForm({
   const router = useRouter();
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const isRejected = approvalStatus === "Rejected";
@@ -117,10 +118,12 @@ export default function EditListingForm({
       )}
 
       <PropertyForm
+        disabled={isSubmitting || saved || deleted}
         actionSlot={
           <button
             type="button"
             onClick={handleDelete}
+            disabled={isSubmitting || saved || deleted}
             className="w-full border border-red-300 hover:border-red-600 hover:text-red-600 text-red-600 py-3 rounded-lg font-semibold transition"
           >
             Delete Listing
@@ -128,24 +131,35 @@ export default function EditListingForm({
         }
         mode="edit"
         defaultValues={defaultValues}
+        photoManagementHref={`/listings/${listingId}/photos`}
+        submitLabel={
+          isSubmitting ? "Saving..." : saved ? "Saved" : "Save Listing"
+        }
         onSubmit={async (event) => {
           event.preventDefault();
           const form = event.currentTarget;
 
           setError("");
+          setSaved(false);
+          setIsSubmitting(true);
 
-          const response = await fetch(`/api/listings/${listingId}`, {
-            method: "PUT",
-            body: new FormData(form),
-          });
+          try {
+            const response = await fetch(`/api/listings/${listingId}`, {
+              method: "PUT",
+              body: new FormData(form),
+            });
 
-          if (!response.ok) {
-            const result = await response.json();
-            setError(result.error ?? "Please try again.");
-            return;
+            if (!response.ok) {
+              const result = await response.json();
+              setError(result.error ?? "Please try again.");
+              return;
+            }
+
+            setSaved(true);
+            router.refresh();
+          } finally {
+            setIsSubmitting(false);
           }
-
-          setSaved(true);
         }}
       />
     </>

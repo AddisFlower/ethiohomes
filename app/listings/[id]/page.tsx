@@ -2,8 +2,13 @@ import { getListingById, isPubliclyVisibleListing } from "@/lib/listings";
 import {
   canManageListing,
   canUseAdminFeatures,
+  canUseAgentFeatures,
   getAppSession,
 } from "@/lib/auth";
+import {
+  canAgentBrowseListing,
+  getShowingEligibility,
+} from "@/lib/listing-rules";
 import ListingDetailActions from "./ListingDetailActions";
 
 export default async function PropertyDetails({
@@ -20,7 +25,12 @@ export default async function PropertyDetails({
     property &&
     (isPubliclyVisibleListing(property) ||
       isOwner ||
+      (canUseAgentFeatures(session) &&
+        canAgentBrowseListing(property, session.user.id)) ||
       canUseAdminFeatures(session));
+  const showingEligibility = property
+    ? getShowingEligibility(property)
+    : { allowed: false, message: null };
 
   if (!property || !canViewListing) {
     return (
@@ -121,14 +131,14 @@ export default async function PropertyDetails({
           <div>
             <p className="text-gray-500">Bedrooms</p>
             <p className="font-semibold text-black">
-              {property.bedrooms}
+              {property.bedrooms ?? "Not applicable"}
             </p>
           </div>
 
           <div>
             <p className="text-gray-500">Bathrooms</p>
             <p className="font-semibold text-black">
-              {property.bathrooms}
+              {property.bathrooms ?? "Not applicable"}
             </p>
           </div>
 
@@ -158,7 +168,12 @@ export default async function PropertyDetails({
           {property.description}
         </p>
 
-        <ListingDetailActions isOwner={isOwner} listingId={property.id} />
+        <ListingDetailActions
+          isOwner={isOwner}
+          listingId={property.id}
+          showingAllowed={showingEligibility.allowed}
+          showingUnavailableMessage={showingEligibility.message}
+        />
       </div>
     </main>
   );

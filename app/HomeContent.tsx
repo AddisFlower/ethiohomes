@@ -24,15 +24,42 @@ export default function HomeContent({
   unapprovedListingsCount,
 }: HomeContentProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [listingPreset, setListingPreset] = useState("ALL");
+  const [propertyType, setPropertyType] = useState("ALL");
   const router = useRouter();
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const query = searchTerm.trim();
-    router.push(
-      query ? `/listings?search=${encodeURIComponent(query)}` : "/listings"
-    );
+    const params = new URLSearchParams();
+
+    if (query) {
+      params.set("search", query);
+    }
+
+    if (propertyType !== "ALL") {
+      params.set("propertyType", propertyType);
+    }
+
+    if (listingPreset === "RESIDENTIAL_SALE") {
+      params.set("category", "Residential");
+      params.set("transactionType", "For Sale");
+    } else if (listingPreset === "RESIDENTIAL_RENT") {
+      params.set("category", "Residential");
+      params.set("transactionType", "For Rent");
+    } else if (listingPreset === "COMMERCIAL_SALE") {
+      params.set("category", "Commercial");
+      params.set("transactionType", "For Sale");
+    } else if (listingPreset === "COMMERCIAL_RENT") {
+      params.set("category", "Commercial");
+      params.set("transactionType", "For Rent");
+    } else if (listingPreset !== "ALL") {
+      params.set("propertyType", listingPreset);
+    }
+
+    const queryString = params.toString();
+    router.push(queryString ? `/listings?${queryString}` : "/listings");
   }
 
   return (
@@ -62,29 +89,69 @@ export default function HomeContent({
                 className="flex-1 px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700"
               />
 
-              <select className="px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700">
-                <option className="bg-white text-black">All Listings</option>
-                <option className="bg-white text-black">
+              <select
+                value={listingPreset}
+                onChange={(event) => setListingPreset(event.target.value)}
+                className="px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700"
+              >
+                <option value="ALL" className="bg-white text-black">
+                  All Listings
+                </option>
+                <option
+                  value="RESIDENTIAL_SALE"
+                  className="bg-white text-black"
+                >
                   Residential Sale
                 </option>
-                <option className="bg-white text-black">
+                <option
+                  value="RESIDENTIAL_RENT"
+                  className="bg-white text-black"
+                >
                   Residential Rent
                 </option>
-                <option className="bg-white text-black">Multi-Family</option>
-                <option className="bg-white text-black">Land</option>
-                <option className="bg-white text-black">Commercial Sale</option>
-                <option className="bg-white text-black">Commercial Rent</option>
+                <option value="Multi-Family" className="bg-white text-black">
+                  Multi-Family
+                </option>
+                <option value="Land" className="bg-white text-black">
+                  Land
+                </option>
+                <option
+                  value="COMMERCIAL_SALE"
+                  className="bg-white text-black"
+                >
+                  Commercial Sale
+                </option>
+                <option
+                  value="COMMERCIAL_RENT"
+                  className="bg-white text-black"
+                >
+                  Commercial Rent
+                </option>
               </select>
 
-              <select className="px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700">
-                <option className="bg-white text-black">
+              <select
+                value={propertyType}
+                onChange={(event) => setPropertyType(event.target.value)}
+                className="px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700"
+              >
+                <option value="ALL" className="bg-white text-black">
                   All Property Types
                 </option>
-                <option className="bg-white text-black">Apartment</option>
-                <option className="bg-white text-black">Villa</option>
-                <option className="bg-white text-black">Condo</option>
-                <option className="bg-white text-black">Office</option>
-                <option className="bg-white text-black">Land</option>
+                <option value="Apartment" className="bg-white text-black">
+                  Apartment
+                </option>
+                <option value="Villa" className="bg-white text-black">
+                  Villa
+                </option>
+                <option value="Condo" className="bg-white text-black">
+                  Condo
+                </option>
+                <option value="Office" className="bg-white text-black">
+                  Office
+                </option>
+                <option value="Land" className="bg-white text-black">
+                  Land
+                </option>
               </select>
 
               <button

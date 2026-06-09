@@ -1,9 +1,15 @@
 "use client";
 
+import type { FormEvent } from "react";
 import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Property } from "@/lib/listings";
+import {
+  getShowingEligibility,
+  marketStatuses,
+  propertyTypes,
+} from "@/lib/listing-rules";
 
 type ListingsContentProps = {
   currentUserId: string | null;
@@ -18,9 +24,66 @@ export default function ListingsContent({
   const [searchTerm, setSearchTerm] = useState(
     () => searchParams.get("search") ?? ""
   );
-  const [transactionType, setTransactionType] = useState("ALL");
-  const [marketStatus, setMarketStatus] = useState("ALL");
-  const [propertyType, setPropertyType] = useState("ALL");
+  const [transactionType, setTransactionType] = useState(
+    () => searchParams.get("transactionType") ?? "ALL"
+  );
+  const [marketStatus, setMarketStatus] = useState(
+    () => searchParams.get("marketStatus") ?? "ALL"
+  );
+  const [propertyType, setPropertyType] = useState(
+    () => searchParams.get("propertyType") ?? "ALL"
+  );
+  const [category, setCategory] = useState(
+    () => searchParams.get("category") ?? "ALL"
+  );
+  const [showingListing, setShowingListing] = useState<Property | null>(null);
+  const [showingError, setShowingError] = useState("");
+  const [showingLoading, setShowingLoading] = useState(false);
+  const [showingSuccessId, setShowingSuccessId] = useState<string | null>(null);
+
+  async function handleShowingSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!showingListing) {
+      return;
+    }
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    setShowingError("");
+    setShowingLoading(true);
+
+    try {
+      const response = await fetch("/api/showing-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId: showingListing.id,
+          name: String(formData.get("name") ?? ""),
+          email: String(formData.get("email") ?? ""),
+          phone: String(formData.get("phone") ?? ""),
+          preferredDatetime: String(
+            formData.get("preferredDatetime") ?? ""
+          ),
+          message: String(formData.get("message") ?? ""),
+        }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        setShowingError(result.error ?? "Please try again.");
+        return;
+      }
+
+      setShowingSuccessId(showingListing.id);
+      setShowingListing(null);
+    } finally {
+      setShowingLoading(false);
+    }
+  }
 
   const filteredProperties = properties.filter((property) => {
     const search = searchTerm.toLowerCase();
@@ -37,12 +100,21 @@ export default function ListingsContent({
 
     const matchesPropertyType =
       propertyType === "ALL" || property.propertyType === propertyType;
+    const matchesCategory =
+      category === "ALL" ||
+      (category === "Residential" &&
+        ["Apartment", "Villa", "House", "Condo", "Multi-Family"].includes(
+          property.propertyType
+        )) ||
+      (category === "Commercial" &&
+        ["Commercial", "Office"].includes(property.propertyType));
 
     return (
       matchesSearch &&
       matchesTransactionType &&
       matchesMarketStatus &&
-      matchesPropertyType
+      matchesPropertyType &&
+      matchesCategory
     );
   });
 
@@ -76,15 +148,26 @@ export default function ListingsContent({
         </select>
 
         <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="bg-white text-black px-4 py-3 rounded-lg border border-gray-300 mb-8 ml-4"
+        >
+          <option value="ALL">All Categories</option>
+          <option value="Residential">Residential</option>
+          <option value="Commercial">Commercial / Office</option>
+        </select>
+
+        <select
           value={marketStatus}
           onChange={(e) => setMarketStatus(e.target.value)}
           className="bg-white text-black px-4 py-3 rounded-lg border border-gray-300 mb-8 ml-4"
         >
           <option value="ALL">All Market Statuses</option>
-          <option value="Coming Soon">Coming Soon</option>
-          <option value="Active">Active</option>
-          <option value="Pending">Pending</option>
-          <option value="Closed">Closed</option>
+          {marketStatuses.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
         </select>
 
         <select
@@ -93,25 +176,40 @@ export default function ListingsContent({
           className="bg-white text-black px-4 py-3 rounded-lg border border-gray-300 mb-8 ml-4"
         >
           <option value="ALL">All Property Types</option>
-          <option value="Apartment">Apartment</option>
-          <option value="Villa">Villa</option>
-          <option value="House">House</option>
+          {propertyTypes.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
         </select>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {filteredProperties.map((property) => {
             const isOwner = currentUserId === property.ownerId;
+            const showingEligibility = getShowingEligibility(property);
 
             return (
               <div
                 key={property.id}
-                className="bg-white rounded-xl overflow-hidden shadow-lg hover:scale-105 transition duration-300"
+                className={`bg-white rounded-xl overflow-hidden shadow-lg transition duration-300 ${
+                  property.approvalStatus === "Rejected"
+                    ? "border-2 border-red-500"
+                    : ""
+                }`}
               >
-                <img
-                  src={property.image}
-                  alt={property.title}
-                  className="h-56 w-full object-cover"
-                />
+                <div className="relative">
+                  <img
+                    src={property.image}
+                    alt={property.title}
+                    className="h-56 w-full object-cover"
+                  />
+
+                  {property.approvalStatus === "Rejected" && (
+                    <span className="absolute left-3 top-3 rounded-full bg-red-600 px-4 py-2 text-sm font-bold uppercase tracking-wide text-white shadow-lg">
+                      Rejected
+                    </span>
+                  )}
+                </div>
 
                 <div className="p-5">
                   <h2 className="text-2xl font-semibold text-black mb-2">
@@ -133,7 +231,13 @@ export default function ListingsContent({
                       {property.marketStatus}
                     </span>
 
-                    <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        property.approvalStatus === "Rejected"
+                          ? "bg-red-100 text-red-700 ring-1 ring-red-300"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
                       {property.approvalStatus}
                     </span>
 
@@ -145,6 +249,15 @@ export default function ListingsContent({
                   </div>
 
                   <div className="flex flex-col gap-3">
+                    {showingSuccessId === property.id && (
+                      <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
+                        <p className="font-semibold">Showing request sent.</p>
+                        <p className="text-sm">
+                          The listing agent can now follow up with you.
+                        </p>
+                      </div>
+                    )}
+
                     <Link href={`/listings/${property.id}`}>
                       <button className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3 rounded-lg cursor-pointer transition">
                         View Details
@@ -157,13 +270,18 @@ export default function ListingsContent({
                           Edit Listing
                         </button>
                       </Link>
-                    ) : (
-                      <Link href={`/listings/${property.id}`}>
-                        <button className="w-full border border-gray-300 hover:border-emerald-700 hover:text-emerald-700 text-black py-3 rounded-lg transition">
-                          Request Showing
-                        </button>
-                      </Link>
-                    )}
+                    ) : showingEligibility.allowed ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowingError("");
+                          setShowingListing(property);
+                        }}
+                        className="w-full border border-gray-300 hover:border-emerald-700 hover:text-emerald-700 text-black py-3 rounded-lg transition"
+                      >
+                        Request Showing
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -188,6 +306,7 @@ export default function ListingsContent({
                 setTransactionType("ALL");
                 setMarketStatus("ALL");
                 setPropertyType("ALL");
+                setCategory("ALL");
               }}
               className="bg-emerald-700 hover:bg-emerald-800 text-white px-6 py-3 rounded-lg font-semibold transition"
             >
@@ -196,6 +315,129 @@ export default function ListingsContent({
           </div>
         )}
       </div>
+
+      {showingListing && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="showing-form-title"
+        >
+          <form
+            onSubmit={handleShowingSubmit}
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h2
+                  id="showing-form-title"
+                  className="text-2xl font-bold text-black"
+                >
+                  Request a Showing
+                </h2>
+                <p className="mt-1 text-gray-600">{showingListing.title}</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowingListing(null)}
+                className="rounded-lg border border-gray-300 px-3 py-2 font-semibold text-gray-700 hover:border-gray-500"
+              >
+                Close
+              </button>
+            </div>
+
+            {showingError && (
+              <div className="mb-5 rounded-xl border border-red-300 bg-red-50 p-4 text-red-700">
+                <p className="font-semibold">
+                  Showing request could not be submitted.
+                </p>
+                <p className="text-sm">{showingError}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block font-semibold text-black">
+                  Name
+                </label>
+                <input
+                  name="name"
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-black"
+                  placeholder="Your name"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block font-semibold text-black">
+                  Email
+                </label>
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-black"
+                  placeholder="you@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block font-semibold text-black">
+                  Phone
+                </label>
+                <input
+                  name="phone"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-black"
+                  placeholder="Optional"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block font-semibold text-black">
+                  Preferred Date/Time
+                </label>
+                <input
+                  name="preferredDatetime"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-black"
+                  placeholder="Optional, e.g. June 12 at 3 PM"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="mb-2 block font-semibold text-black">
+                Message
+              </label>
+              <textarea
+                name="message"
+                rows={4}
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-black"
+                placeholder="Optional notes for the agent"
+              />
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={showingLoading}
+                className="rounded-lg bg-emerald-700 px-6 py-3 font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {showingLoading ? "Submitting..." : "Submit Request"}
+              </button>
+
+              <button
+                type="button"
+                disabled={showingLoading}
+                onClick={() => setShowingListing(null)}
+                className="rounded-lg border border-gray-300 px-6 py-3 font-semibold text-black transition hover:border-emerald-700 hover:text-emerald-700 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </main>
   );
 }

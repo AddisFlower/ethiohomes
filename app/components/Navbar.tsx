@@ -27,11 +27,14 @@ export default async function Navbar() {
 
             <div className="hidden group-hover:block absolute left-0 top-full mt-0 w-72 bg-white border-2 border-emerald-700 rounded-lg shadow-xl p-5 z-50">
               <div className="flex flex-col gap-3 text-gray-700">
-                <Link href="/listings">Browse Listings</Link>
-                <Link href="/listings">Residential Sale</Link>
-                <Link href="/listings">Residential Rent</Link>
-                <Link href="/listings">Land</Link>
-                <Link href="/listings">Commercial</Link>
+                <Link href="/listings?category=Residential&transactionType=For%20Sale">
+                  Residential Sale
+                </Link>
+                <Link href="/listings?category=Residential&transactionType=For%20Rent">
+                  Residential Rent
+                </Link>
+                <Link href="/listings?propertyType=Land">Land</Link>
+                <Link href="/listings?category=Commercial">Commercial</Link>
               </div>
             </div>
           </div>

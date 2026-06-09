@@ -1,7 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import type { FormEvent } from "react";
 import type { ReactNode } from "react";
+import { useState } from "react";
+import {
+  createMarketStatuses,
+  getPropertyFieldRules,
+  marketStatuses,
+  propertyTypes,
+  transactionTypes,
+} from "@/lib/listing-rules";
 
 export type PropertyFormDefaultValues = {
   title?: string;
@@ -23,6 +32,7 @@ type PropertyFormProps = {
   defaultValues?: PropertyFormDefaultValues;
   disabled?: boolean;
   onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
+  photoManagementHref?: string;
   submitLabel?: string;
 };
 
@@ -32,10 +42,24 @@ export default function PropertyForm({
   defaultValues,
   disabled = false,
   onSubmit,
+  photoManagementHref,
   submitLabel,
 }: PropertyFormProps) {
   const isEditMode = mode === "edit";
   const defaultSubmitLabel = isEditMode ? "Save Listing" : "Submit Listing";
+  const [propertyType, setPropertyType] = useState(
+    defaultValues?.propertyType ?? "Apartment"
+  );
+  const [bedrooms, setBedrooms] = useState(
+    defaultValues?.bedrooms?.toString() ?? ""
+  );
+  const [bathrooms, setBathrooms] = useState(
+    defaultValues?.bathrooms?.toString() ?? ""
+  );
+  const fieldRules = getPropertyFieldRules(propertyType);
+  const availableMarketStatuses = isEditMode
+    ? marketStatuses
+    : createMarketStatuses;
 
   return (
     <form
@@ -49,10 +73,11 @@ export default function PropertyForm({
         event.preventDefault();
       }}
     >
-      <div>
-        <label className="block text-black font-semibold mb-2">
-          Property Title
-        </label>
+      <fieldset disabled={disabled} className="space-y-6">
+        <div>
+          <label className="block text-black font-semibold mb-2">
+            Property Title
+          </label>
 
         <input
           name="title"
@@ -62,7 +87,7 @@ export default function PropertyForm({
           defaultValue={defaultValues?.title}
           className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
         />
-      </div>
+        </div>
 
       <div>
         <label className="block text-black font-semibold mb-2">
@@ -122,14 +147,26 @@ export default function PropertyForm({
 
         <select
           name="propertyType"
-          defaultValue={defaultValues?.propertyType ?? "Apartment"}
+          value={propertyType}
+          onChange={(event) => {
+            const nextPropertyType = event.target.value;
+            const nextRules = getPropertyFieldRules(nextPropertyType);
+
+            setPropertyType(nextPropertyType);
+
+            if (!nextRules.showBedrooms) {
+              setBedrooms("");
+            }
+
+            if (!nextRules.showBathrooms) {
+              setBathrooms("");
+            }
+          }}
           className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
         >
-          <option>Apartment</option>
-          <option>Villa</option>
-          <option>House</option>
-          <option>Land</option>
-          <option>Commercial</option>
+          {propertyTypes.map((type) => (
+            <option key={type}>{type}</option>
+          ))}
         </select>
       </div>
 
@@ -144,8 +181,9 @@ export default function PropertyForm({
           defaultValue={defaultValues?.transactionType ?? "For Sale"}
           className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
         >
-          <option>For Sale</option>
-          <option>For Rent</option>
+          {transactionTypes.map((type) => (
+            <option key={type}>{type}</option>
+          ))}
         </select>
       </div>
 
@@ -160,47 +198,53 @@ export default function PropertyForm({
           defaultValue={defaultValues?.marketStatus ?? "Active"}
           className="w-full border border-gray-300 rounded-lg px-4 py-3 text-black"
         >
-          <option>Coming Soon</option>
-          <option>Active</option>
-          <option>Pending</option>
-          <option>Closed</option>
-          <option>Off Market</option>
+          {availableMarketStatuses.map((status) => (
+            <option key={status}>{status}</option>
+          ))}
         </select>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-black font-semibold mb-2">
-            Bedrooms
-          </label>
+      {(fieldRules.showBedrooms || fieldRules.showBathrooms) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {fieldRules.showBedrooms && (
+            <div>
+              <label className="block text-black font-semibold mb-2">
+                Bedrooms
+              </label>
 
-          <input
-            name="bedrooms"
-            type="number"
-            placeholder="3"
-            defaultValue={defaultValues?.bedrooms}
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-black"
-            required
-            min={1}
-          />
+              <input
+                name="bedrooms"
+                type="number"
+                placeholder="3"
+                value={bedrooms}
+                onChange={(event) => setBedrooms(event.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-black"
+                required={fieldRules.bedroomsRequired}
+                min={0}
+              />
+            </div>
+          )}
+
+          {fieldRules.showBathrooms && (
+            <div>
+              <label className="block text-black font-semibold mb-2">
+                Bathrooms{fieldRules.bathroomsRequired ? "" : " (Optional)"}
+              </label>
+
+              <input
+                name="bathrooms"
+                type="number"
+                placeholder="2"
+                value={bathrooms}
+                onChange={(event) => setBathrooms(event.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-black"
+                required={fieldRules.bathroomsRequired}
+                min={0}
+              />
+            </div>
+          )}
         </div>
-
-        <div>
-          <label className="block text-black font-semibold mb-2">
-            Bathrooms
-          </label>
-
-          <input
-            name="bathrooms"
-            type="number"
-            placeholder="2"
-            defaultValue={defaultValues?.bathrooms}
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-black"
-            required
-            min={1}
-          />
-        </div>
-      </div>
+      )}
 
       <div>
         <label className="block text-black font-semibold mb-2">
@@ -218,22 +262,26 @@ export default function PropertyForm({
       </div>
 
       {isEditMode ? (
-        <div>
-          <label className="block text-black font-semibold mb-2">
-            Property Image URL
-          </label>
-
-          <input
-            name="image"
-            type="url"
-            required
-            defaultValue={defaultValues?.image}
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-black"
-          />
-
-          <p className="text-sm text-gray-500 mt-2">
-            Current property image used for this listing.
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <p className="font-semibold text-black">Primary Property Image</p>
+          {defaultValues?.image && (
+            <img
+              src={defaultValues.image}
+              alt="Current listing"
+              className="mt-3 h-48 w-full rounded-lg object-cover"
+            />
+          )}
+          <p className="text-sm text-gray-600 mt-3">
+            Photo changes use file upload through Manage Photos.
           </p>
+          {photoManagementHref && (
+            <Link
+              href={photoManagementHref}
+              className="mt-3 inline-flex font-semibold text-emerald-700 hover:text-emerald-800"
+            >
+              Manage Photos
+            </Link>
+          )}
         </div>
       ) : (
         <div>
@@ -269,6 +317,7 @@ export default function PropertyForm({
 
         {actionSlot}
       </div>
+      </fieldset>
     </form>
   );
 }

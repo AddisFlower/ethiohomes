@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { getListingById, isPubliclyVisibleListing } from "@/lib/listings";
+import { getListingById } from "@/lib/listings";
+import { getShowingEligibility } from "@/lib/listing-rules";
 import { supabaseRequest } from "@/lib/supabase";
 
 export type ShowingRequest = {
@@ -89,12 +90,20 @@ export async function createShowingRequest(
 
   const listing = await getListingById(listingId);
 
-  if (!listing || !isPubliclyVisibleListing(listing)) {
+  if (!listing) {
     throw new Error("Listing not found.");
   }
 
   if (requesterUserId && listing.ownerId === requesterUserId) {
     throw new Error("Owners cannot request showings for their own listings.");
+  }
+
+  const showingEligibility = getShowingEligibility(listing);
+
+  if (!showingEligibility.allowed) {
+    throw new Error(
+      showingEligibility.message ?? "This listing is not accepting showings."
+    );
   }
 
   const rows = await supabaseRequest<ShowingRequestRow[]>("/showing_requests", {

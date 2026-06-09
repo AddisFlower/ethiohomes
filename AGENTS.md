@@ -21,7 +21,7 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
   - `DELETE /api/listings/[id]` deletes listings.
   - `PUT /api/listings/[id]/photo` replaces a listing's primary photo.
   - `POST /api/showing-requests` stores public showing requests/inquiries.
-  - `PATCH /api/admin/listings/[id]/approval` approves or rejects listings through mocked admin access.
+  - `PATCH /api/admin/listings/[id]/approval` approves or rejects listings through role-checked admin access.
 - Reads are routed through `lib/listings.ts`:
   - Home promoted listings.
   - Browse listings.
@@ -46,7 +46,7 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Public/non-owner showing requests persist to Supabase and can be reviewed by agents.
 - Owner-only primary photo management page.
 - Add Listing supports optional Supabase Storage image upload.
-- Supabase-backed admin approval workflow with mocked admin access.
+- Supabase-backed admin approval workflow with role-checked admin access.
 - Admin review supports Unapproved, Approved, Rejected, and All filters.
 - Agent/admin Showing Requests page for submitted listing inquiries, scoped to listings the signed-in user owns.
 - Rejections store a rejection reason.
@@ -59,6 +59,14 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Demo-polished navbar fallback routes for deferred pages.
 - Styled not-found and access-denied states.
 - Last Updated display now uses the database-owned `updated_at` timestamp instead of storing generated display text.
+- Live dashboard counts link to My Listings, Showing Requests, and the admin Unapproved queue.
+- Listing visibility is role-aware for public visitors, agents, owners, and admins.
+- Showing requests are limited to Approved + Active listings in both UI and server logic.
+- Residential room fields are required; Land stores null rooms; Commercial/Office use optional bathrooms and null bedrooms.
+- Add Listing excludes Pending and Closed; Edit Listing supports the full market lifecycle.
+- Edit Listing uses Manage Photos file upload instead of raw image URL editing.
+- Successful login redirects to the dashboard.
+- Navbar and home listing presets apply real Browse filters.
 
 ## Supabase Integration Status
 - Supabase/Postgres is the active persistence layer for listings.
@@ -125,8 +133,8 @@ Important columns:
 - `transaction_type text not null` - either `For Sale` or `For Rent`.
 - `market_status text not null` - `Coming Soon`, `Active`, `Pending`, `Closed`, or `Off Market`.
 - `verified boolean not null default false`
-- `bedrooms integer not null`
-- `bathrooms integer not null`
+- `bedrooms integer` - nullable when bedrooms do not apply.
+- `bathrooms integer` - nullable for Land and optional for Commercial/Office.
 - `agent text not null`
 - `approval_status text not null` - `Unapproved`, `Approved`, or `Rejected`.
 - `rejection_reason text`
@@ -205,6 +213,8 @@ Seed data:
   - Agents see requests for listings they own on `/showing-requests`.
   - Admins do not get global showing request access; admins see only requests for listings they personally own.
   - Showing requests are agent-owned lead data, not global admin moderation data.
+  - Requests are accepted only for Approved + Active listings.
+  - Coming Soon, Pending, Closed, Off Market, Unapproved, and Rejected listings cannot receive showing requests.
   - Email notifications are not implemented yet.
 - Admins can approve or reject listings through `/admin`.
 - Admins can filter and review Unapproved, Approved, Rejected, and All listings.
@@ -212,6 +222,9 @@ Seed data:
 - Editing a rejected listing resubmits it by setting `approval_status = Unapproved` and clearing `rejection_reason`.
 - Public browse/detail shows only `approval_status = Approved` listings with `market_status` in `Coming Soon`, `Active`, `Pending`, or `Closed`.
 - Public browse/detail hides Unapproved listings, Rejected listings, and Off Market listings.
+- Authenticated agents can browse public-visible listings plus Off Market listings from other agents.
+- Owners can always browse and open all of their own listings regardless of approval or market status.
+- Admins can browse and open all listings.
 - Closed listings remain publicly visible.
 - More market statuses may be added later depending on agent, admin, and client feedback.
 - `owner_id` remains `text` for now so old seeded `agent-1`/`agent-2` demo rows can coexist with new Supabase Auth UUID owner IDs.
@@ -234,20 +247,123 @@ Future client/buyer capabilities should be built on top of the `client` role:
 - Search preferences and alerts.
 - Client-facing saved search or dashboard views.
 
-## Remaining MVP Tasks Ranked by Priority
-1. Update app metadata from default Create Next App values to EthioMLS.
-2. Clean stale AGENTS/manual checklist wording after the status and showing-request changes.
-3. Add live dashboard counts:
-   - My Listings count.
-   - Showing Requests count.
-   - Unapproved listings count for admins.
-4. Improve showing request workflow states beyond `New`.
-5. Replace or persist Save Listing so it is no longer local-only.
-6. Add Row Level Security policies after auth and demo flows are stable.
-7. Remove silent production fallback risk or surface a clear Supabase-read warning later.
-8. Improve photo UX consistency between create, edit, and photo management later.
-9. Replace hard delete with soft delete if listing recovery/audit history matters.
-10. Consider switching raw `<img>` tags to Next `<Image />` if image optimization becomes important.
+## Future Ownership Architecture: Agent vs Brokerage
+The current ownership model is:
+
+```text
+Listing -> Agent
+```
+
+Real agencies may require:
+
+```text
+Brokerage -> Agent -> Listing
+```
+
+Before scaling beyond individual agents, decide whether:
+- Listings are owned by an individual agent, a brokerage, or both.
+- Brokerage administrators can manage all listings and leads for their team.
+- Agents can transfer listings between team members.
+- Showing requests and reporting belong to the listing agent or the brokerage.
+- Agent profiles can belong to one or multiple brokerages.
+
+Brokerage/team ownership does not need to block the current internal demo, but it should be considered before the ownership schema and RLS policies become difficult to change.
+
+## Strategic Roadmap
+
+### Before Client Accounts
+These are the most urgent architecture and security requirements:
+
+1. Finish the remaining UX bugs found through manual testing.
+   - Why: The current MVP is feature-complete enough for internal demos, so obvious workflow defects should be resolved before expanding the role model.
+   - Dependencies: Existing manual QA checklist and role-specific test accounts.
+
+2. Add automated authorization and visibility tests.
+   - Cover public, agent, owner, admin, and future-client boundaries.
+   - Test listing reads, direct detail access, writes, photo access, showing requests, and admin approval.
+   - Why: The visibility model is already complex enough that manual testing alone is fragile.
+   - Dependencies: Stable test fixtures and a dedicated Supabase test environment or database test strategy.
+
+3. Fix missing-profile role fallback behavior.
+   - An authenticated user without a `public.profiles` row must never become an agent automatically.
+   - Missing profiles should produce denied access or an explicit incomplete-onboarding state.
+   - Why: Automatic agent fallback would be a privilege-escalation risk once client accounts exist.
+   - Dependencies: Reliable profile creation, preferably through a database trigger, plus explicit handling for incomplete profiles.
+
+4. Migrate ownership IDs to UUID relationships.
+   - Convert `listings.owner_id` from `text` to a UUID foreign key referencing the authenticated profile/user.
+   - Convert or replace `showing_requests.agent_owner_id` with a proper UUID relationship.
+   - Add a foreign key from showing requests to listings and decide retention behavior for archived listings.
+   - Preserve existing data through a deliberate demo-data migration.
+   - Why: Text demo identities prevent reliable referential integrity and complicate RLS.
+   - Dependencies: Remove or map `agent-1`/`agent-2` seed identities and define deletion/archival behavior.
+
+5. Implement Row Level Security and user-scoped Supabase access.
+   - Public users should read only public-visible listings.
+   - Agents should manage only owned listings and owned lead data.
+   - Admins should retain review access without gaining ownership of other agents' leads.
+   - Server helpers should use the authenticated user's access token where user-scoped policies apply instead of always using the service-role key.
+   - Why: Current application-route checks are not a sufficient database security boundary.
+   - Dependencies: UUID ownership migration, finalized role semantics, and automated authorization tests.
+
+6. Remove or explicitly disable silent production fallback to mock listings.
+   - Mock fallback may remain available only in development or an explicit demo mode.
+   - Production read failures should surface a clear operational state and server logging.
+   - Why: Silent fallback can make outages look like valid data and could mix demo listings with real user expectations.
+   - Dependencies: Environment-aware configuration and basic error/health reporting.
+
+7. Introduce client accounts only after the items above are complete.
+   - Client accounts must not share listing ownership semantics with agents.
+   - Client capabilities should be added incrementally after role and database enforcement are stable.
+
+### Before Production/Public Launch
+These items can follow the pre-client security foundation but should be completed before public reliance on the platform:
+
+1. Persist Save Listing/Favorites or hide the action.
+   - Favorites are the largest visible unfinished buyer-facing feature.
+   - The current local-only success state should not remain visible in a public launch.
+   - Preferred timing: implement with or immediately after client accounts so favorites have a durable owner.
+
+2. Add privacy and abuse controls for public lead forms.
+   - Add rate limiting, bot protection, payload limits, and duplicate-request protection.
+   - Document who can access requester contact data and how long it is retained.
+
+3. Replace hard delete with archival or soft delete.
+   - Preserve listing history, showing requests, auditability, and recovery options.
+
+4. Add audit history for approval and market-status changes.
+   - Record who changed a status, when it changed, and any rejection reason.
+
+5. Normalize production data fields.
+   - Store price as a numeric amount with a separate currency.
+   - Store preferred showing time as `timestamptz` rather than free text.
+   - Normalize location fields when geographic search requirements are clear.
+   - Remove the legacy `listings.status` column after migration confidence is established.
+   - Reassess whether `verified` should remain once approval state is authoritative.
+
+6. Harden authentication operations.
+   - Configure custom SMTP and branded recovery templates.
+   - Define agent onboarding/approval so public signup cannot grant an agent role unintentionally.
+   - Add operational logging and monitoring for auth and data failures.
+
+7. Improve listing media for real property marketing.
+   - Move from one `listings.image` value to a `listing_media` table with multiple images, ordering, and a primary image.
+   - Multi-photo galleries should follow client accounts in the current sequence unless real-agent demos make them urgent.
+
+8. Improve accessibility, image optimization, and automated workflow coverage.
+   - Address existing raw `<img>` warnings where appropriate.
+   - Add regression coverage for auth, CRUD, visibility, filters, and lead submission.
+
+### Post-Client Product Expansion
+After client accounts are introduced:
+- Add persistent favorites/saved listings and saved-list management.
+- Add client inquiry and showing-request history.
+- Add showing-request workflow statuses such as Contacted, Scheduled, Completed, and Closed.
+- Add multi-photo galleries and media ordering.
+- Add saved searches, search alerts, and client dashboard views.
+- Consider agent/brokerage analytics, listing views, saves, and inquiry conversion.
+
+Showing-request statuses beyond `New` are useful for real agent operations, but `New`-only is acceptable for the current MVP and internal demos.
 
 ## Latest MVP/Demo Audit
 Current status:
@@ -266,48 +382,32 @@ Current status:
 - Admin approval permissions remain separate from showing request privacy.
 
 Top remaining recommendations by priority:
-1. Update app metadata from `Create Next App` to EthioMLS.
-2. Clean stale AGENTS/manual checklist wording.
-3. Add live dashboard counts.
-4. Improve showing request workflow states.
-5. Replace or persist Save Listing.
-6. Add RLS policies later.
-7. Remove or surface production fallback risk later.
-8. Improve photo UX consistency later.
-9. Replace hard delete with soft delete later.
-10. Add Next Image optimization later.
+1. Finish remaining UX bugs found in manual testing.
+2. Add automated authorization and visibility tests.
+3. Fix missing-profile role fallback so missing profiles never become agents.
+4. Migrate `owner_id` and `agent_owner_id` to proper UUID relationships.
+5. Implement RLS and user-scoped Supabase access.
+6. Remove or disable silent production fallback to mock data.
+7. Introduce client accounts.
+8. Add favorites, inquiry history, showing-request statuses, and multi-photo galleries.
 
 Recommended next implementation slice:
-- Update app metadata/title/description to EthioMLS.
-- Add live dashboard counts:
-  - My Listings count.
-  - Showing Requests count.
-  - Unapproved listings count for admins.
-- Link each metric to its real page:
-  - My Listings -> `/my-listings`.
-  - Showing Requests -> `/showing-requests`.
-  - Unapproved listings -> `/admin?status=Unapproved`.
-
-Session pause note:
-- User is taking a break.
-- Do not make application code changes right now.
-- Only documentation changes were requested for this update.
+- Finish any remaining manual-QA UX bugs, then add automated authorization and visibility tests before changing identity or RLS behavior.
 
 ## Known Limitations and Technical Debt
-- Create/update/delete use Supabase service role through server routes. This is acceptable for the current mocked-auth MVP but should be revisited with real auth and RLS.
+- Create/update/delete use Supabase service role through server routes and should be revisited with RLS.
 - Auth is enforced in app route handlers and server pages; RLS is still disabled for this phase.
 - Reads silently fall back to mock data if Supabase fails, which helps local resilience but can hide production configuration issues.
 - Delete is currently a hard delete.
 - Add Listing uses a fallback image when no primary image is uploaded.
-- Edit Listing still uses image URL; owner photo replacement is handled on `/listings/[id]/photos`.
+- Edit Listing displays the current image and routes replacements through `/listings/[id]/photos`.
 - Photo management supports one primary image only; galleries and ordering are future work.
-- Save Listing only shows a local success state.
-- Showing request status is currently always `New`; no follow-up workflow is implemented yet.
-- Admin access is mocked and should be replaced with real admin roles when auth is implemented.
+- Save Listing only shows a local success state. It should be hidden until client accounts or replaced with persistent favorites when client accounts are introduced.
+- Showing request status is currently always `New`; this is acceptable for MVP/internal demos, but a follow-up workflow will be valuable after client accounts.
+- Admin access uses `public.profiles.role`; database RLS is still pending.
 - `verified` remains a supporting database flag and should not be treated as the primary UI state.
-- Home dashboard metrics are static.
 - No automated tests exist yet.
-- Auth helpers currently fall back gracefully if `public.profiles` is missing, but the `profiles` table should still be created in Supabase for normal operation.
+- Auth helpers currently treat an authenticated user with no profile as an agent. This must be removed before client accounts; missing profiles must never grant agent capabilities.
 - If an existing database still has a legacy `updated_at_label` column, app code ignores it. Do not read from it or write to it.
 - The old `listings.status` column remains only as a temporary migration-safety field. New application behavior uses `transaction_type` and `market_status`.
 
@@ -328,15 +428,18 @@ Reason for postponing:
 - The current MVP implementation is sufficient for listing creation, review, display, and demo workflows.
 - Additional normalization should be driven by future search/filter requirements and real listing data patterns.
 
-## Recommended First Task for Next Session
-Add Row Level Security policies.
-
-Goal:
-- Add owner and admin RLS policies for `public.listings`.
-- Keep public read access aligned with approved listings.
-- Preserve admin review capabilities.
+## Recommended Next Sequence
+1. Finish remaining UX bugs found in manual testing.
+2. Add automated authorization and visibility tests.
+3. Fix missing-profile role fallback.
+4. Migrate ownership IDs to UUIDs.
+5. Implement RLS and user-scoped Supabase access.
+6. Introduce client accounts.
+7. Add favorites, inquiry history, showing-request statuses, and multi-photo galleries.
 
 ## Manual Testing Checklist
+The current detailed QA scheme is in `docs/qa-manual-testing.md`.
+
 Run these after Supabase env vars are configured and `supabase/listings.sql` has been applied.
 
 ### Auth
@@ -484,16 +587,16 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Keep MVP changes narrow and verify with `npm run lint`.
 
 ## Next Session Context
-- User stopped work for today and asked for this `AGENTS.md` update only.
-- Do not assume application code changes are desired at the start of the next session.
 - Current app has Supabase listing persistence for CRUD.
 - Current app has Supabase Storage primary image uploads.
-- Current app has Supabase-backed admin approval/rejection with mocked admin access.
+- Current app has Supabase-backed admin approval/rejection with profile roles.
 - Current app has Supabase Auth login/signup/logout plus forgot/reset password flows.
 - Current app has role-aware agent/admin navigation and friendly auth errors.
+- Current app has role-aware listing visibility and Approved + Active showing eligibility.
+- Run `supabase/qa-product-rules-migration.sql` in existing Supabase environments.
+- Detailed regression coverage is documented in `docs/qa-manual-testing.md`.
 - Supabase REST URL bug was diagnosed: `NEXT_PUBLIC_SUPABASE_URL` must not include `/rest/v1`.
 - User successfully tested adding a new home after Supabase setup.
 - Database-owned MLS ID generation is implemented through Postgres sequence/function.
-- Recommended next engineering task is to implement Supabase Auth and replace mocked identities.
-- Recommended next engineering task after auth stabilization is to add Row Level Security policies.
+- Recommended next engineering task is to add Row Level Security policies.
 - Build command was previously blocked by an intermittent Windows sandbox `spawn setup refresh` error; lint passed with only existing `<img>` warnings.

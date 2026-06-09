@@ -4,6 +4,19 @@ import {
   supabaseRequest,
   uploadSupabaseStorageObject,
 } from "@/lib/supabase";
+import {
+  approvalStatuses,
+  canAgentBrowseListing,
+  createMarketStatuses,
+  getPropertyFieldRules,
+  isPubliclyVisibleListing,
+  marketStatuses,
+  propertyTypes,
+  type ApprovalStatus,
+  type MarketStatus,
+  transactionTypes,
+  type TransactionType,
+} from "@/lib/listing-rules";
 
 export type Property = {
   id: string;
@@ -16,8 +29,8 @@ export type Property = {
   transactionType: TransactionType;
   marketStatus: MarketStatus;
   verified: boolean;
-  bedrooms: number;
-  bathrooms: number;
+  bedrooms: number | null;
+  bathrooms: number | null;
   agent: string;
   updatedAt: string;
   updatedAtTimestamp: string | null;
@@ -39,8 +52,8 @@ type ListingRow = {
   transaction_type: string | null;
   market_status: string | null;
   verified: boolean;
-  bedrooms: number;
-  bathrooms: number;
+  bedrooms: number | null;
+  bathrooms: number | null;
   agent: string;
   updated_at: string | null;
   approval_status: string;
@@ -51,37 +64,18 @@ type ListingRow = {
 };
 
 type ListingOwnerRow = {
+  approval_status: string;
   owner_id: string;
 };
 
-export type ApprovalStatus = "Unapproved" | "Approved" | "Rejected";
-export type MarketStatus =
-  | "Coming Soon"
-  | "Active"
-  | "Pending"
-  | "Closed"
-  | "Off Market";
-export type TransactionType = "For Sale" | "For Rent";
+export type { ApprovalStatus, MarketStatus, TransactionType };
 
 const fallbackImage =
   "https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1200&auto=format&fit=crop";
 const listingImagesBucket = "listing-images";
-const publicMarketStatuses: MarketStatus[] = [
-  "Coming Soon",
-  "Active",
-  "Pending",
-  "Closed",
-];
-
 function toMarketStatus(value: string | null | undefined): MarketStatus {
-  if (
-    value === "Coming Soon" ||
-    value === "Active" ||
-    value === "Pending" ||
-    value === "Closed" ||
-    value === "Off Market"
-  ) {
-    return value;
+  if (marketStatuses.includes(value as MarketStatus)) {
+    return value as MarketStatus;
   }
 
   return "Active";
@@ -97,15 +91,7 @@ function toTransactionType(
   return "For Sale";
 }
 
-export function isPubliclyVisibleListing(listing: {
-  approvalStatus: string;
-  marketStatus: string;
-}) {
-  return (
-    listing.approvalStatus === "Approved" &&
-    publicMarketStatuses.includes(listing.marketStatus as MarketStatus)
-  );
-}
+export { isPubliclyVisibleListing };
 
 function formatUpdatedAt(updatedAt: string | null) {
   if (!updatedAt) {
@@ -185,31 +171,111 @@ function toProperty(row: ListingRow): Property {
 }
 
 function toApprovalStatus(value: string): ApprovalStatus {
-  if (value === "Approved" || value === "Rejected") {
-    return value;
+  if (approvalStatuses.includes(value as ApprovalStatus)) {
+    return value as ApprovalStatus;
   }
 
   return "Unapproved";
 }
 
-function fromFormData(formData: FormData, imageUrl?: string) {
+function getRequiredText(formData: FormData, key: string, label: string) {
+  const value = String(formData.get(key) ?? "").trim();
+
+  if (!value) {
+    throw new Error(`${label} is required.`);
+  }
+
+  return value;
+}
+
+function getOptionalNumber(formData: FormData, key: string) {
+  const value = String(formData.get(key) ?? "").trim();
+
+  if (!value) {
+    return null;
+  }
+
+  const number = Number(value);
+
+  if (!Number.isInteger(number) || number < 0) {
+    throw new Error(`${key === "bedrooms" ? "Bedrooms" : "Bathrooms"} must be a valid number.`);
+  }
+
+  return number;
+}
+
+function fromFormData(formData: FormData, mode: "create" | "edit") {
   const city = String(formData.get("city") ?? "Addis Ababa");
   const price = Number(formData.get("price") ?? 0);
-  const image =
-    (imageUrl ?? String(formData.get("image") ?? "")) || fallbackImage;
+  const propertyType = getRequiredText(
+    formData,
+    "propertyType",
+    "Property type"
+  );
+  const transactionType = getRequiredText(
+    formData,
+    "transactionType",
+    "Transaction type"
+  );
+  const marketStatus = getRequiredText(
+    formData,
+    "marketStatus",
+    "Market status"
+  );
+  const fieldRules = getPropertyFieldRules(propertyType);
+  const bedrooms = fieldRules.showBedrooms
+    ? getOptionalNumber(formData, "bedrooms")
+    : null;
+  const bathrooms = fieldRules.showBathrooms
+    ? getOptionalNumber(formData, "bathrooms")
+    : null;
+
+  if (!propertyTypes.includes(propertyType as (typeof propertyTypes)[number])) {
+    throw new Error("Select a valid property type.");
+  }
+
+  if (!transactionTypes.includes(transactionType as TransactionType)) {
+    throw new Error("Select a valid transaction type.");
+  }
+
+  if (!marketStatuses.includes(marketStatus as MarketStatus)) {
+    throw new Error("Select a valid market status.");
+  }
+
+  if (
+    mode === "create" &&
+    !createMarketStatuses.includes(
+      marketStatus as (typeof createMarketStatuses)[number]
+    )
+  ) {
+    throw new Error(
+      "New listings can only be Coming Soon, Active, or Off Market."
+    );
+  }
+
+  if (fieldRules.bedroomsRequired && bedrooms === null) {
+    throw new Error("Bedrooms are required for residential listings.");
+  }
+
+  if (fieldRules.bathroomsRequired && bathrooms === null) {
+    throw new Error("Bathrooms are required for residential listings.");
+  }
+
+  if (!Number.isFinite(price) || price < 1) {
+    throw new Error("Price must be at least 1 ETB.");
+  }
 
   return {
-    title: String(formData.get("title") ?? ""),
+    title: getRequiredText(formData, "title", "Property title"),
     price: `${price.toLocaleString("en-US")} ETB`,
     location: city,
-    address: String(formData.get("address") ?? ""),
-    property_type: String(formData.get("propertyType") ?? "Apartment"),
-    transaction_type: String(formData.get("transactionType") ?? "For Sale"),
-    market_status: String(formData.get("marketStatus") ?? "Active"),
-    bedrooms: Number(formData.get("bedrooms") ?? 0),
-    bathrooms: Number(formData.get("bathrooms") ?? 0),
-    description: String(formData.get("description") ?? ""),
-    image,
+    address: getRequiredText(formData, "address", "Property address"),
+    property_type: propertyType,
+    transaction_type: transactionType,
+    market_status: marketStatus,
+    bedrooms,
+    bathrooms,
+    description: getRequiredText(formData, "description", "Description"),
   };
 }
 
@@ -252,12 +318,16 @@ async function uploadListingImage(formData: FormData, listingId: string) {
 
 async function assertListingOwner(id: string, ownerId: string) {
   const rows = await supabaseRequest<ListingOwnerRow[]>(
-    `/listings?select=owner_id&id=eq.${encodeURIComponent(id)}&limit=1`
+    `/listings?select=owner_id,approval_status&id=eq.${encodeURIComponent(
+      id
+    )}&limit=1`
   );
 
   if (!rows[0] || rows[0].owner_id !== ownerId) {
     throw new Error("Listing not found or access denied.");
   }
+
+  return rows[0];
 }
 
 export async function getListings(): Promise<Property[]> {
@@ -270,6 +340,41 @@ export async function getListings(): Promise<Property[]> {
   } catch {
     return mockProperties.filter(isPubliclyVisibleListing);
   }
+}
+
+export async function getListingsForViewer(
+  role: "public" | "agent" | "admin",
+  userId?: string
+): Promise<Property[]> {
+  if (role === "admin") {
+    try {
+      const rows = await supabaseRequest<ListingRow[]>(
+        "/listings?select=*&order=updated_at.desc"
+      );
+
+      return rows.map(toProperty);
+    } catch {
+      return mockProperties;
+    }
+  }
+
+  if (role === "agent" && userId) {
+    try {
+      const rows = await supabaseRequest<ListingRow[]>(
+        "/listings?select=*&order=updated_at.desc"
+      );
+
+      return rows
+        .map(toProperty)
+        .filter((listing) => canAgentBrowseListing(listing, userId));
+    } catch {
+      return mockProperties.filter((listing) =>
+        canAgentBrowseListing(listing, userId)
+      );
+    }
+  }
+
+  return getListings();
 }
 
 export async function getListingById(id: string): Promise<Property | null> {
@@ -324,8 +429,9 @@ export async function createListing(
   const id = randomUUID();
   const imageUrl = await uploadListingImage(formData, id);
   const body = {
-    ...fromFormData(formData, imageUrl),
+    ...fromFormData(formData, "create"),
     id,
+    image: imageUrl ?? fallbackImage,
     verified: false,
     agent: agentName,
     approval_status: "Unapproved",
@@ -381,7 +487,7 @@ export async function updateListingPhoto(
   formData: FormData,
   ownerId: string
 ) {
-  await assertListingOwner(id, ownerId);
+  const existingListing = await assertListingOwner(id, ownerId);
 
   const imageUrl = await uploadListingImage(formData, id);
 
@@ -400,6 +506,13 @@ export async function updateListingPhoto(
       },
       body: JSON.stringify({
         image: imageUrl,
+        ...(existingListing.approval_status === "Rejected"
+          ? {
+              approval_status: "Unapproved",
+              verified: false,
+              rejection_reason: null,
+            }
+          : {}),
       }),
     }
   );
@@ -429,7 +542,7 @@ export async function updateListing(
   }
 
   const body = {
-    ...fromFormData(formData),
+    ...fromFormData(formData, "edit"),
     ...(existingRows[0].approval_status === "Rejected"
       ? {
           approval_status: "Unapproved",

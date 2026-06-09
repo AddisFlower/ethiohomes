@@ -75,8 +75,8 @@ export default async function EditListingPage({
             propertyType: property.propertyType,
             transactionType: property.transactionType,
             marketStatus: property.marketStatus,
-            bedrooms: property.bedrooms,
-            bathrooms: property.bathrooms,
+            bedrooms: property.bedrooms ?? "",
+            bathrooms: property.bathrooms ?? "",
             description: property.description,
             image: property.image,
           }}

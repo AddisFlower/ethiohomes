@@ -8,11 +8,15 @@ import { useState } from "react";
 type ListingDetailActionsProps = {
   isOwner: boolean;
   listingId: string;
+  showingAllowed: boolean;
+  showingUnavailableMessage: string | null;
 };
 
 export default function ListingDetailActions({
   isOwner,
   listingId,
+  showingAllowed,
+  showingUnavailableMessage,
 }: ListingDetailActionsProps) {
   const router = useRouter();
   const [showingRequested, setShowingRequested] = useState(false);
@@ -98,11 +102,18 @@ export default function ListingDetailActions({
   return (
     <div className="space-y-4">
       {showingRequested && (
-        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-800">
-          <p className="font-semibold">Showing request submitted.</p>
-          <p className="text-sm">
-            The listing agent can now view this request in EthioMLS.
+        <div className="rounded-2xl border-2 border-emerald-400 bg-emerald-50 p-6 text-emerald-900 shadow-sm">
+          <p className="text-2xl font-bold">Showing request sent.</p>
+          <p className="mt-2 text-sm">
+            The listing agent has received your inquiry and can follow up using
+            the contact information you provided.
           </p>
+          <Link
+            href="/listings"
+            className="mt-5 inline-flex bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg font-semibold transition"
+          >
+            Back to Browse Listings
+          </Link>
         </div>
       )}
 
@@ -113,7 +124,7 @@ export default function ListingDetailActions({
         </div>
       )}
 
-      {showShowingForm && !isOwner && (
+      {showShowingForm && !isOwner && showingAllowed && (
         <form
           onSubmit={handleShowingSubmit}
           className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4"
@@ -240,13 +251,23 @@ export default function ListingDetailActions({
           </>
         ) : (
           <>
-            <button
-              type="button"
-              onClick={() => setShowShowingForm(true)}
-              className="bg-emerald-700 hover:bg-emerald-800 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
-            >
-              Request Showing
-            </button>
+            {showingAllowed ? (
+              <button
+                type="button"
+                onClick={() => setShowShowingForm(true)}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
+              >
+                Request Showing
+              </button>
+            ) : (
+              <div className="w-full rounded-xl border border-yellow-300 bg-yellow-50 p-4 text-yellow-900">
+                <p className="font-semibold">Showings unavailable</p>
+                <p className="text-sm">
+                  {showingUnavailableMessage ??
+                    "This listing is not accepting showing requests."}
+                </p>
+              </div>
+            )}
 
             <button
               type="button"
