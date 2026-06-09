@@ -235,15 +235,63 @@ Future client/buyer capabilities should be built on top of the `client` role:
 - Client-facing saved search or dashboard views.
 
 ## Remaining MVP Tasks Ranked by Priority
-1. Add Row Level Security policies after auth exists.
-2. Convert `listings.owner_id` from text to uuid after demo rows are cleaned up.
-3. Replace hard delete with soft delete if listing recovery/audit history matters.
-4. Expand photo uploads into multi-photo galleries and ordering.
-5. Add email notifications for showing requests if needed.
-6. Replace demo navbar fallback routes with real Clients, Financial, Subscription, Billing, and Settings pages.
-7. Replace static dashboard metrics with real Supabase-derived counts.
-8. Update app metadata from default Next.js values.
-9. Consider switching raw `<img>` tags to Next `<Image />` if image optimization becomes important.
+1. Update app metadata from default Create Next App values to EthioMLS.
+2. Clean stale AGENTS/manual checklist wording after the status and showing-request changes.
+3. Add live dashboard counts:
+   - My Listings count.
+   - Showing Requests count.
+   - Unapproved listings count for admins.
+4. Improve showing request workflow states beyond `New`.
+5. Replace or persist Save Listing so it is no longer local-only.
+6. Add Row Level Security policies after auth and demo flows are stable.
+7. Remove silent production fallback risk or surface a clear Supabase-read warning later.
+8. Improve photo UX consistency between create, edit, and photo management later.
+9. Replace hard delete with soft delete if listing recovery/audit history matters.
+10. Consider switching raw `<img>` tags to Next `<Image />` if image optimization becomes important.
+
+## Latest MVP/Demo Audit
+Current status:
+- MVP listing CRUD is Supabase-backed and Vercel build is passing.
+- Listing status model redesign is complete:
+  - `approval_status`: `Unapproved`, `Approved`, `Rejected`.
+  - `market_status`: `Coming Soon`, `Active`, `Pending`, `Closed`, `Off Market`.
+  - `transaction_type`: `For Sale`, `For Rent`.
+- Public browse/detail visibility is approval/lifecycle filtered.
+- Supabase Auth email/password flows are implemented for agent/admin access.
+- Showing requests/inquiries are persistent in `public.showing_requests`.
+- Showing requests are owner-only lead data:
+  - Agents see requests only for listings they own.
+  - Admins do not get global showing request visibility.
+  - Admins see showing requests only for listings they personally own.
+- Admin approval permissions remain separate from showing request privacy.
+
+Top remaining recommendations by priority:
+1. Update app metadata from `Create Next App` to EthioMLS.
+2. Clean stale AGENTS/manual checklist wording.
+3. Add live dashboard counts.
+4. Improve showing request workflow states.
+5. Replace or persist Save Listing.
+6. Add RLS policies later.
+7. Remove or surface production fallback risk later.
+8. Improve photo UX consistency later.
+9. Replace hard delete with soft delete later.
+10. Add Next Image optimization later.
+
+Recommended next implementation slice:
+- Update app metadata/title/description to EthioMLS.
+- Add live dashboard counts:
+  - My Listings count.
+  - Showing Requests count.
+  - Unapproved listings count for admins.
+- Link each metric to its real page:
+  - My Listings -> `/my-listings`.
+  - Showing Requests -> `/showing-requests`.
+  - Unapproved listings -> `/admin?status=Unapproved`.
+
+Session pause note:
+- User is taking a break.
+- Do not make application code changes right now.
+- Only documentation changes were requested for this update.
 
 ## Known Limitations and Technical Debt
 - Create/update/delete use Supabase service role through server routes. This is acceptable for the current mocked-auth MVP but should be revisited with real auth and RLS.

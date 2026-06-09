@@ -10,12 +10,18 @@ type HomeContentProps = {
   properties: Property[];
   isAgent: boolean;
   isAdmin: boolean;
+  myListingsCount: number;
+  showingRequestsCount: number;
+  unapprovedListingsCount: number;
 };
 
 export default function HomeContent({
   properties,
   isAgent,
   isAdmin,
+  myListingsCount,
+  showingRequestsCount,
+  unapprovedListingsCount,
 }: HomeContentProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
@@ -123,68 +129,67 @@ export default function HomeContent({
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-emerald-700">
+            <Link
+              href="/my-listings"
+              className="block bg-white rounded-xl shadow-md p-6 border-l-4 border-emerald-700 transition hover:-translate-y-1 hover:shadow-lg"
+            >
+              <p className="text-4xl font-bold text-emerald-700 mb-3">
+                {myListingsCount}
+              </p>
               <h3 className="text-xl font-bold text-black mb-2">
                 My Listings
               </h3>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600">
                 Open your active, pending, and rejected listings.
               </p>
-              <Link
-                href="/my-listings"
-                className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
-              >
-                View My Listings
-              </Link>
-            </div>
+            </Link>
 
-            <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
-              <h3 className="text-xl font-bold text-black mb-2">
-                Add Listing
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Submit a new property and send it for review.
+            <Link
+              href="/showing-requests"
+              className="block bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500 transition hover:-translate-y-1 hover:shadow-lg"
+            >
+              <p className="text-4xl font-bold text-yellow-600 mb-3">
+                {showingRequestsCount}
               </p>
+              <h3 className="text-xl font-bold text-black mb-2">
+                Showing Requests
+              </h3>
+              <p className="text-gray-600">
+                Review buyer and renter inquiries for your listings.
+              </p>
+            </Link>
+
+            {isAdmin ? (
+              <Link
+                href="/admin?status=Unapproved"
+                className="block bg-white rounded-xl shadow-md p-6 border-l-4 border-red-600 transition hover:-translate-y-1 hover:shadow-lg"
+              >
+                <p className="text-4xl font-bold text-red-600 mb-3">
+                  {unapprovedListingsCount}
+                </p>
+                <h3 className="text-xl font-bold text-black mb-2">
+                  Unapproved Listings
+                </h3>
+                <p className="text-gray-600">
+                  Review listings waiting for an approval decision.
+                </p>
+              </Link>
+            ) : (
               <Link
                 href="/add-listing"
-                className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
+                className="block bg-white rounded-xl shadow-md p-6 border-l-4 border-red-600 transition hover:-translate-y-1 hover:shadow-lg"
               >
-                Create Listing
+                <p className="text-sm font-bold uppercase tracking-wide text-red-600 mb-3">
+                  New property
+                </p>
+                <h3 className="text-xl font-bold text-black mb-2">
+                  Add Listing
+                </h3>
+                <p className="text-gray-600">
+                  Submit a new property and send it for review.
+                </p>
               </Link>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-600">
-              <h3 className="text-xl font-bold text-black mb-2">
-                Manage Listings
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Update your properties and handle ownership actions.
-              </p>
-              <div className="flex flex-col gap-3">
-                <Link
-                  href="/my-listings"
-                  className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
-                >
-                  Edit and Review
-                </Link>
-
-                <Link
-                  href="/showing-requests"
-                  className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
-                >
-                  Showing Requests
-                </Link>
-
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
-                  >
-                    Admin Dashboard
-                  </Link>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         </section>
       )}
