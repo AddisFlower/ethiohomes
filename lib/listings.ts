@@ -343,7 +343,7 @@ export async function getListings(): Promise<Property[]> {
 }
 
 export async function getListingsForViewer(
-  role: "public" | "agent" | "admin",
+  role: "public" | "incomplete" | "agent" | "admin",
   userId?: string
 ): Promise<Property[]> {
   if (role === "admin") {

@@ -23,7 +23,6 @@ export default function ListingDetailActions({
   const [showShowingForm, setShowShowingForm] = useState(false);
   const [showingError, setShowingError] = useState("");
   const [showingLoading, setShowingLoading] = useState(false);
-  const [listingSaved, setListingSaved] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
@@ -210,15 +209,6 @@ export default function ListingDetailActions({
         </form>
       )}
 
-      {listingSaved && (
-        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-800">
-          <p className="font-semibold">Listing saved.</p>
-          <p className="text-sm">
-            This listing has been added to your saved list for this MVP flow.
-          </p>
-        </div>
-      )}
-
       {deleteError && (
         <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-700">
           <p className="font-semibold">Listing could not be deleted.</p>
@@ -249,34 +239,22 @@ export default function ListingDetailActions({
               Delete Listing
             </button>
           </>
+        ) : showingAllowed ? (
+          <button
+            type="button"
+            onClick={() => setShowShowingForm(true)}
+            className="bg-emerald-700 hover:bg-emerald-800 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
+          >
+            Request Showing
+          </button>
         ) : (
-          <>
-            {showingAllowed ? (
-              <button
-                type="button"
-                onClick={() => setShowShowingForm(true)}
-                className="bg-emerald-700 hover:bg-emerald-800 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
-              >
-                Request Showing
-              </button>
-            ) : (
-              <div className="w-full rounded-xl border border-yellow-300 bg-yellow-50 p-4 text-yellow-900">
-                <p className="font-semibold">Showings unavailable</p>
-                <p className="text-sm">
-                  {showingUnavailableMessage ??
-                    "This listing is not accepting showing requests."}
-                </p>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setListingSaved(true)}
-              className="border border-gray-300 hover:border-emerald-700 hover:text-emerald-700 text-black px-8 py-4 rounded-xl text-lg font-semibold transition"
-            >
-              Save Listing
-            </button>
-          </>
+          <div className="w-full rounded-xl border border-yellow-300 bg-yellow-50 p-4 text-yellow-900">
+            <p className="font-semibold">Showings unavailable</p>
+            <p className="text-sm">
+              {showingUnavailableMessage ??
+                "This listing is not accepting showing requests."}
+            </p>
+          </div>
         )}
       </div>
     </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getListingById } from "@/lib/listings";
 import { canManageListing, getAppSession } from "@/lib/auth";
+import AgentProfileRequired from "@/components/AgentProfileRequired";
 import PhotoManagementForm from "./PhotoManagementForm";
 
 export default async function ManagePhotosPage({
@@ -31,6 +32,10 @@ export default async function ManagePhotosPage({
 
   if (session.role === "public") {
     redirect("/login");
+  }
+
+  if (session.role === "incomplete") {
+    return <AgentProfileRequired />;
   }
 
   if (!canManageListing(session, property)) {

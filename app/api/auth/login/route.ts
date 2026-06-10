@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getFriendlyAuthError, logAuthError } from "@/lib/auth-errors";
 import { getAuthCookieNames } from "@/lib/auth";
-import { getSupabaseConfig, supabaseRequest } from "@/lib/supabase";
+import { getSupabaseConfig } from "@/lib/supabase";
 
 type LoginBody = {
   email?: string;
@@ -12,25 +12,7 @@ type LoginResponse = {
   access_token: string;
   expires_in: number;
   refresh_token: string;
-  user?: {
-    id: string;
-    email?: string;
-    user_metadata?: {
-      full_name?: string;
-      name?: string;
-    };
-  };
 };
-
-function getNameFromEmail(email?: string) {
-  const name = email?.split("@")[0]?.replace(/[._-]+/g, " ").trim();
-
-  if (!name) {
-    return "Agent";
-  }
-
-  return name.replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
 
 export async function POST(request: Request) {
   try {
@@ -82,25 +64,6 @@ export async function POST(request: Request) {
     }
 
     const result = (await authResponse.json()) as LoginResponse;
-
-    if (result.user?.id) {
-      // TODO: Move profile creation into a database trigger once auth/RLS is hardened.
-      await supabaseRequest("/profiles?on_conflict=id", {
-        method: "POST",
-        headers: {
-          Prefer: "resolution=ignore-duplicates",
-        },
-        body: JSON.stringify({
-          id: result.user.id,
-          full_name:
-            result.user.user_metadata?.full_name?.trim() ||
-            result.user.user_metadata?.name?.trim() ||
-            getNameFromEmail(result.user.email ?? email),
-          agency_name: null,
-          role: "agent",
-        }),
-      }).catch(() => undefined);
-    }
 
     const response = NextResponse.json({ ok: true });
     const cookieNames = getAuthCookieNames();

@@ -97,6 +97,26 @@ export function canAgentBrowseListing(
   );
 }
 
+export function canViewerBrowseListing(
+  listing: {
+    approvalStatus: string;
+    marketStatus: string;
+    ownerId: string;
+  },
+  role: "public" | "incomplete" | "agent" | "admin",
+  userId?: string
+) {
+  if (role === "admin") {
+    return true;
+  }
+
+  if (role === "agent" && userId) {
+    return canAgentBrowseListing(listing, userId);
+  }
+
+  return isPubliclyVisibleListing(listing);
+}
+
 export function getShowingEligibility(listing: {
   approvalStatus: string;
   marketStatus: string;

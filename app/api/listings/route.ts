@@ -1,20 +1,31 @@
 import { NextResponse } from "next/server";
-import { canUseAgentFeatures, getAppSession } from "@/lib/auth";
+import {
+  canUseAgentFeatures,
+  getAgentAccessDenial,
+  getAppSession,
+} from "@/lib/auth";
 import { createListing } from "@/lib/listings";
 
 export async function POST(request: Request) {
   try {
     const session = await getAppSession();
+    const denial = getAgentAccessDenial(session);
+    const agentSession = canUseAgentFeatures(session) ? session : null;
 
-    if (!canUseAgentFeatures(session) || !session.user) {
-      return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+    if (denial || !agentSession) {
+      return NextResponse.json(
+        { error: denial?.error ?? "Agent profile required." },
+        { status: denial?.status ?? 403 }
+      );
     }
 
     const formData = await request.formData();
     const listing = await createListing(
       formData,
-      session.user.id,
-      session.profile.full_name ?? session.user.email ?? "EthioMLS Agent"
+      agentSession.user.id,
+      agentSession.profile.full_name ??
+        agentSession.user.email ??
+        "EthioMLS Agent"
     );
 
     return NextResponse.json({ listing });

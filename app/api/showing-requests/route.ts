@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canUseAgentFeatures, getAppSession } from "@/lib/auth";
+import { getAppSession, isAuthenticated } from "@/lib/auth";
 import { createShowingRequest } from "@/lib/showing-requests";
 
 export async function POST(request: Request) {
@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const showingRequest = await createShowingRequest(
       body,
-      canUseAgentFeatures(session) ? session.user.id : undefined
+      isAuthenticated(session) ? session.user.id : undefined
     );
 
     return NextResponse.json({ showingRequest });

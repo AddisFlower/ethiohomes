@@ -105,6 +105,24 @@ Use a non-owner visitor or agent for each test.
 3. Repeat with an admin and confirm the destination is `/`.
 4. Confirm the dashboard cards display the correct role-aware counts.
 
+## Missing Profile Authorization
+
+1. Create a Supabase Auth user, then delete the matching `public.profiles` row.
+2. Sign in with that user's email and password.
+3. Confirm sign-in succeeds without creating a replacement profile.
+4. Confirm the navbar shows the account and Logout but no Add Listing, My
+   Listings, Showing Requests, or Admin links.
+5. Open `/add-listing`, `/my-listings`, `/showing-requests`, and `/admin`.
+6. Confirm each protected agent page displays Agent profile required without
+   redirecting back to login.
+7. Open an existing listing's edit and photo-management URLs.
+8. Confirm both display Agent profile required.
+9. Send direct create, update, delete, and photo API requests.
+10. Confirm each request returns `403` with `Agent profile required.`
+11. Confirm public Browse and public-visible listing detail pages still work.
+12. Confirm Logout works.
+13. Restore a valid `agent` profile and confirm agent capabilities return.
+
 ## Navbar And Dashboard Filters
 
 1. Select Residential Sale and confirm only residential For Sale listings appear.
@@ -115,4 +133,3 @@ Use a non-owner visitor or agent for each test.
 6. Confirm Browse filters initialize from URL parameters.
 7. Combine search, category, transaction, market status, and property type filters.
 8. Click Clear Filters and confirm the viewer-appropriate listing set returns.
-

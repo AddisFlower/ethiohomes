@@ -1,12 +1,17 @@
 import { redirect } from "next/navigation";
 import { canUseAgentFeatures, getAppSession } from "@/lib/auth";
+import AgentProfileRequired from "@/components/AgentProfileRequired";
 import AddListingForm from "./AddListingForm";
 
 export default async function AddListingPage() {
   const session = await getAppSession();
 
-  if (!canUseAgentFeatures(session)) {
+  if (session.role === "public") {
     redirect("/login");
+  }
+
+  if (!canUseAgentFeatures(session)) {
+    return <AgentProfileRequired />;
   }
 
   return (

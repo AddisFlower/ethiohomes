@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { canUseAgentFeatures, getAppSession } from "@/lib/auth";
+import {
+  canUseAgentFeatures,
+  getAgentAccessDenial,
+  getAppSession,
+} from "@/lib/auth";
 import { deleteListing, updateListing } from "@/lib/listings";
 
 export async function PUT(
@@ -8,14 +12,19 @@ export async function PUT(
 ) {
   try {
     const session = await getAppSession();
+    const denial = getAgentAccessDenial(session);
+    const agentSession = canUseAgentFeatures(session) ? session : null;
 
-    if (!canUseAgentFeatures(session) || !session.user) {
-      return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+    if (denial || !agentSession) {
+      return NextResponse.json(
+        { error: denial?.error ?? "Agent profile required." },
+        { status: denial?.status ?? 403 }
+      );
     }
 
     const { id } = await params;
     const formData = await request.formData();
-    const listing = await updateListing(id, formData, session.user.id);
+    const listing = await updateListing(id, formData, agentSession.user.id);
 
     return NextResponse.json({ listing });
   } catch (error) {
@@ -37,14 +46,19 @@ export async function DELETE(
 ) {
   try {
     const session = await getAppSession();
+    const denial = getAgentAccessDenial(session);
+    const agentSession = canUseAgentFeatures(session) ? session : null;
 
-    if (!canUseAgentFeatures(session) || !session.user) {
-      return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+    if (denial || !agentSession) {
+      return NextResponse.json(
+        { error: denial?.error ?? "Agent profile required." },
+        { status: denial?.status ?? 403 }
+      );
     }
 
     const { id } = await params;
     // TODO: Replace this hard delete with soft delete if listing recovery is needed.
-    await deleteListing(id, session.user.id);
+    await deleteListing(id, agentSession.user.id);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

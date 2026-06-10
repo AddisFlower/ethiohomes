@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { getSupabaseConfig, supabaseRequest } from "@/lib/supabase";
 
-export type AppRole = "public" | "agent" | "admin";
+export type AppRole = "public" | "incomplete" | "agent" | "admin";
 
 export type AuthUser = {
   id: string;
@@ -26,12 +26,21 @@ export type AppSession =
       profile: null;
     }
   | {
+      role: "incomplete";
+      user: AuthUser;
+      profile: null;
+    }
+  | {
       role: "agent" | "admin";
       user: AuthUser;
       profile: Profile;
     };
 
 export type AuthenticatedSession = Exclude<AppSession, { role: "public" }>;
+export type AgentSession = Extract<
+  AppSession,
+  { role: "agent" | "admin" }
+>;
 
 type SupabaseUserResponse = {
   id: string;
@@ -89,35 +98,23 @@ async function getCurrentUser(accessToken: string) {
   };
 }
 
-function getNameFromEmail(email?: string) {
-  if (!email) {
-    return "Agent";
-  }
-
-  const name = email.split("@")[0]?.replace(/[._-]+/g, " ").trim();
-
-  if (!name) {
-    return "Agent";
-  }
-
-  return name.replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function getUserDisplayName(user: AuthUser) {
-  return (
-    user.userMetadata?.full_name?.trim() ||
-    user.userMetadata?.name?.trim() ||
-    getNameFromEmail(user.email)
-  );
-}
-
 export async function getProfile(userId: string) {
   try {
-    const rows = await supabaseRequest<Profile[]>(
+    const rows = await supabaseRequest<
+      Array<Omit<Profile, "role"> & { role: string }>
+    >(
       `/profiles?select=*&id=eq.${encodeURIComponent(userId)}&limit=1`
     );
+    const profile = rows[0];
 
-    return rows[0] ?? null;
+    if (!profile || (profile.role !== "agent" && profile.role !== "admin")) {
+      return null;
+    }
+
+    return {
+      ...profile,
+      role: profile.role,
+    } satisfies Profile;
   } catch (error) {
     if (
       error instanceof Error &&
@@ -129,6 +126,25 @@ export async function getProfile(userId: string) {
 
     throw error;
   }
+}
+
+export function createAuthenticatedSession(
+  user: AuthUser,
+  profile: Profile | null
+): AuthenticatedSession {
+  if (!profile) {
+    return {
+      role: "incomplete",
+      user,
+      profile: null,
+    };
+  }
+
+  return {
+    role: profile.role,
+    user,
+    profile,
+  };
 }
 
 export async function getAppSession(): Promise<AppSession> {
@@ -152,25 +168,18 @@ export async function getAppSession(): Promise<AppSession> {
     };
   }
 
-  const profile =
-    (await getProfile(user.id)) ??
-    ({
-      id: user.id,
-      full_name: getUserDisplayName(user),
-      agency_name: null,
-      role: "agent",
-    } satisfies Profile);
+  return createAuthenticatedSession(user, await getProfile(user.id));
+}
 
-  return {
-    role: profile.role,
-    user,
-    profile,
-  };
+export function isAuthenticated(
+  session: AppSession
+): session is AuthenticatedSession {
+  return session.role !== "public";
 }
 
 export function canUseAgentFeatures(
   session: AppSession
-): session is AuthenticatedSession {
+): session is AgentSession {
   return session.role === "agent" || session.role === "admin";
 }
 
@@ -189,4 +198,39 @@ export function canManageListing(
   }
 
   return listing.ownerId === session.user.id;
+}
+
+export function getAgentAccessDenial(session: AppSession) {
+  if (session.role === "public") {
+    return {
+      error: "Sign in required.",
+      status: 401,
+    } as const;
+  }
+
+  if (!canUseAgentFeatures(session)) {
+    return {
+      error: "Agent profile required.",
+      status: 403,
+    } as const;
+  }
+
+  return null;
+}
+
+export function getAdminAccessDenial(session: AppSession) {
+  const agentDenial = getAgentAccessDenial(session);
+
+  if (agentDenial) {
+    return agentDenial;
+  }
+
+  if (!canUseAdminFeatures(session)) {
+    return {
+      error: "Access denied.",
+      status: 403,
+    } as const;
+  }
+
+  return null;
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { canUseAdminFeatures, getAppSession } from "@/lib/auth";
+import AgentProfileRequired from "@/components/AgentProfileRequired";
 import {
   type AdminListingStatusFilter,
   getAdminListings,
@@ -66,6 +67,10 @@ export default async function AdminPage({
   const activeStatus = getStatusFilter(status);
   const isAdmin = canUseAdminFeatures(session);
   const listings = isAdmin ? await getAdminListings(activeStatus) : [];
+
+  if (session.role === "incomplete") {
+    return <AgentProfileRequired />;
+  }
 
   return (
     <main className="min-h-screen bg-gray-100 py-12 px-6">

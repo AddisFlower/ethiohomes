@@ -1,12 +1,11 @@
-import { getListingById, isPubliclyVisibleListing } from "@/lib/listings";
+import { getListingById } from "@/lib/listings";
 import {
   canManageListing,
-  canUseAdminFeatures,
-  canUseAgentFeatures,
   getAppSession,
+  isAuthenticated,
 } from "@/lib/auth";
 import {
-  canAgentBrowseListing,
+  canViewerBrowseListing,
   getShowingEligibility,
 } from "@/lib/listing-rules";
 import ListingDetailActions from "./ListingDetailActions";
@@ -23,11 +22,11 @@ export default async function PropertyDetails({
   const isOwner = property ? canManageListing(session, property) : false;
   const canViewListing =
     property &&
-    (isPubliclyVisibleListing(property) ||
-      isOwner ||
-      (canUseAgentFeatures(session) &&
-        canAgentBrowseListing(property, session.user.id)) ||
-      canUseAdminFeatures(session));
+    canViewerBrowseListing(
+      property,
+      session.role,
+      isAuthenticated(session) ? session.user.id : undefined
+    );
   const showingEligibility = property
     ? getShowingEligibility(property)
     : { allowed: false, message: null };

@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { canUseAdminFeatures, canUseAgentFeatures, getAppSession } from "@/lib/auth";
+import {
+  canUseAdminFeatures,
+  canUseAgentFeatures,
+  getAppSession,
+  isAuthenticated,
+} from "@/lib/auth";
 
 export default async function Navbar() {
   const session = await getAppSession();
@@ -8,7 +13,7 @@ export default async function Navbar() {
   const displayName =
     session.role === "public"
       ? "Account"
-      : session.profile.full_name ?? session.user.email ?? "Account";
+      : session.profile?.full_name ?? session.user.email ?? "Account";
 
   return (
     <nav className="bg-white border-b border-emerald-600 shadow-sm">
@@ -70,7 +75,7 @@ export default async function Navbar() {
         </div>
 
         <div className="relative group ml-auto">
-          {session.role === "public" ? (
+          {!isAuthenticated(session) ? (
             <Link
               href="/login"
               className="border border-emerald-700 text-emerald-700 px-4 py-2 rounded-full font-semibold hover:bg-emerald-100 transition"
@@ -86,9 +91,13 @@ export default async function Navbar() {
               <div className="hidden group-hover:block absolute right-0 top-full mt-0 w-56 bg-white border-2 border-emerald-700 rounded-lg shadow-xl p-5 z-50">
                 <div className="flex flex-col gap-3 text-gray-700">
                   <Link href="/">Dashboard</Link>
-                  <Link href="/my-listings">My Listings</Link>
-                  <Link href="/showing-requests">Showing Requests</Link>
-                  <Link href="/add-listing">Add Listing</Link>
+                  {canUseAgent && (
+                    <>
+                      <Link href="/my-listings">My Listings</Link>
+                      <Link href="/showing-requests">Showing Requests</Link>
+                      <Link href="/add-listing">Add Listing</Link>
+                    </>
+                  )}
                   {canUseAdmin && <Link href="/admin">Admin Review</Link>}
                   <form action="/api/auth/logout" method="post">
                     <button

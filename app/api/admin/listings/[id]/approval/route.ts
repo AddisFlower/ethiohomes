@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { canUseAdminFeatures, getAppSession } from "@/lib/auth";
+import {
+  canUseAdminFeatures,
+  getAdminAccessDenial,
+  getAppSession,
+} from "@/lib/auth";
 import { updateListingApproval } from "@/lib/listings";
 
 type ApprovalRequestBody = {
@@ -13,9 +17,14 @@ export async function PATCH(
 ) {
   try {
     const session = await getAppSession();
+    const denial = getAdminAccessDenial(session);
+    const adminSession = canUseAdminFeatures(session) ? session : null;
 
-    if (!canUseAdminFeatures(session)) {
-      return NextResponse.json({ error: "Access denied." }, { status: 403 });
+    if (denial || !adminSession) {
+      return NextResponse.json(
+        { error: denial?.error ?? "Access denied." },
+        { status: denial?.status ?? 403 }
+      );
     }
 
     const { id } = await params;

@@ -2,12 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { canUseAgentFeatures, getAppSession } from "@/lib/auth";
 import { getListingsByOwner } from "@/lib/listings";
+import AgentProfileRequired from "@/components/AgentProfileRequired";
 
 export default async function MyListingsPage() {
   const session = await getAppSession();
 
-  if (!canUseAgentFeatures(session)) {
+  if (session.role === "public") {
     redirect("/login");
+  }
+
+  if (!canUseAgentFeatures(session)) {
+    return <AgentProfileRequired />;
   }
 
   const myListings = await getListingsByOwner(session.user.id);

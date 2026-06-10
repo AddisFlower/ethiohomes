@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { canUseAgentFeatures, getAppSession } from "@/lib/auth";
 import { getShowingRequests } from "@/lib/showing-requests";
+import AgentProfileRequired from "@/components/AgentProfileRequired";
 
 function formatCreatedAt(value: string) {
   const date = new Date(value);
@@ -36,8 +37,12 @@ function formatPreferredDate(value: string | null) {
 export default async function ShowingRequestsPage() {
   const session = await getAppSession();
 
-  if (!canUseAgentFeatures(session)) {
+  if (session.role === "public") {
     redirect("/login");
+  }
+
+  if (!canUseAgentFeatures(session)) {
+    return <AgentProfileRequired />;
   }
 
   const requests = await getShowingRequests(session.user.id);
