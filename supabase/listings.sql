@@ -1,3 +1,11 @@
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  full_name text,
+  agency_name text,
+  role text not null default 'agent' check (role in ('agent', 'admin')),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.listings (
   id text primary key,
   listing_id text not null unique,
@@ -17,37 +25,33 @@ create table if not exists public.listings (
   rejection_reason text,
   description text not null,
   image text not null,
-  owner_id text not null,
+  owner_id uuid not null references public.profiles(id) on delete cascade,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  full_name text,
-  agency_name text,
-  role text not null default 'agent' check (role in ('agent', 'admin')),
-  created_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (id, owner_id)
 );
 
 create table if not exists public.showing_requests (
   id text primary key,
-  listing_id text not null,
+  listing_id text not null references public.listings(id) on delete cascade,
   listing_title text not null,
   listing_mls_id text not null,
-  agent_owner_id text not null,
+  agent_owner_id uuid not null references public.profiles(id) on delete cascade,
   requester_name text not null,
   requester_email text not null,
   requester_phone text,
   preferred_datetime text,
   message text,
   status text not null default 'New',
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  foreign key (listing_id, agent_owner_id)
+    references public.listings(id, owner_id)
+    on delete cascade
 );
 
 create sequence if not exists public.listing_id_seq
   as integer
-  start with 1004
+  start with 1001
   increment by 1
   minvalue 1;
 
@@ -194,103 +198,17 @@ before update on public.listings
 for each row
 execute function public.set_listings_updated_at();
 
-insert into public.listings (
-  id,
-  listing_id,
-  title,
-  price,
-  location,
-  address,
-  property_type,
-  status,
-  transaction_type,
-  market_status,
-  verified,
-  bedrooms,
-  bathrooms,
-  agent,
-  approval_status,
-  rejection_reason,
-  description,
-  image,
-  owner_id
-) values
-  (
-    '1',
-    'MLS-1001',
-    'Modern Apartment in Bole',
-    '12,500,000 ETB',
-    'Addis Ababa, Bole',
-    'Bole Rwanda Embassy Area, House No. B-214',
-    'Apartment',
-    'For Sale',
-    'For Sale',
-    'Active',
-    true,
-    3,
-    2,
-    'Dawit Realty',
-    'Approved',
-    null,
-    'Beautiful modern apartment located in the heart of Bole near restaurants, shopping centers, and schools.',
-    'https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1200&auto=format&fit=crop',
-    'agent-1'
-  ),
-  (
-    '2',
-    'MLS-1002',
-    'Luxury Villa in Summit',
-    '28,000,000 ETB',
-    'Addis Ababa, Summit',
-    'Summit Figa, near Safari Apartments, Villa 18',
-    'Villa',
-    'For Rent',
-    'For Rent',
-    'Pending',
-    true,
-    5,
-    4,
-    'Habesha Properties',
-    'Unapproved',
-    null,
-    'Spacious luxury villa with modern architecture, large outdoor area, and premium finishes.',
-    'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1200&auto=format&fit=crop',
-    'agent-2'
-  ),
-  (
-    '3',
-    'MLS-1003',
-    'Family Home in CMC',
-    '18,750,000 ETB',
-    'Addis Ababa, CMC',
-    'CMC Michael Road, behind Tsehay Real Estate, House 42',
-    'House',
-    'For Sale',
-    'For Sale',
-    'Active',
-    false,
-    4,
-    3,
-    'Ethio Land Brokers',
-    'Rejected',
-    'Please add clearer exterior photos and confirm the property address.',
-    'Perfect family home in a quiet neighborhood with easy access to schools and shopping.',
-    'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200&auto=format&fit=crop',
-    'agent-1'
-  )
-on conflict (id) do nothing;
-
 select setval(
   'public.listing_id_seq',
   greatest(
-    1003,
+    1000,
     coalesce(
       (
         select max(substring(listing_id from 5)::integer)
         from public.listings
         where listing_id ~ '^MLS-[0-9]{4,6}$'
       ),
-      1003
+      1000
     )
   ),
   true
