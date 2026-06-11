@@ -25,12 +25,12 @@ export default async function Navbar() {
         </Link>
 
         <div className="flex flex-wrap gap-4 md:gap-6 items-center text-sm md:text-base">
-          <div className="relative group">
-            <button className="text-gray-800 font-semibold hover:text-emerald-700 transition">
+          <details className="relative group">
+            <summary className="list-none cursor-pointer text-gray-800 font-semibold hover:text-emerald-700 transition [&::-webkit-details-marker]:hidden">
               Search
-            </button>
+            </summary>
 
-            <div className="hidden group-hover:block absolute left-0 top-full mt-0 w-72 bg-white border-2 border-emerald-700 rounded-lg shadow-xl p-5 z-50">
+            <div className="hidden group-open:block group-hover:block absolute left-0 top-full mt-0 w-72 max-w-[calc(100vw-2rem)] bg-white border-2 border-emerald-700 rounded-lg shadow-xl p-5 z-50">
               <div className="flex flex-col gap-3 text-gray-700">
                 <Link href="/listings?category=Residential&transactionType=For%20Sale">
                   Residential Sale
@@ -42,14 +42,14 @@ export default async function Navbar() {
                 <Link href="/listings?category=Commercial">Commercial</Link>
               </div>
             </div>
-          </div>
+          </details>
 
-          <div className="relative group">
-            <button className="text-gray-800 font-semibold hover:text-emerald-700 transition">
+          <details className="relative group">
+            <summary className="list-none cursor-pointer text-gray-800 font-semibold hover:text-emerald-700 transition [&::-webkit-details-marker]:hidden">
               Listings
-            </button>
+            </summary>
 
-            <div className="hidden group-hover:block absolute left-0 top-full mt-0 w-72 bg-white border-2 border-emerald-700 rounded-lg shadow-xl p-5 z-50">
+            <div className="hidden group-open:block group-hover:block absolute left-0 top-full mt-0 w-72 max-w-[calc(100vw-2rem)] bg-white border-2 border-emerald-700 rounded-lg shadow-xl p-5 z-50">
               <div className="flex flex-col gap-3 text-gray-700">
                 <Link href="/listings">Browse Listings</Link>
 
@@ -62,7 +62,7 @@ export default async function Navbar() {
                 )}
               </div>
             </div>
-          </div>
+          </details>
 
           {canUseAdmin && (
             <Link
@@ -74,7 +74,7 @@ export default async function Navbar() {
           )}
         </div>
 
-        <div className="relative group ml-auto">
+        <div className="relative group md:ml-auto">
           {!isAuthenticated(session) ? (
             <Link
               href="/login"
@@ -83,12 +83,12 @@ export default async function Navbar() {
               Sign In
             </Link>
           ) : (
-            <>
-              <button className="border border-emerald-700 text-emerald-700 px-4 py-2 rounded-full font-semibold hover:bg-emerald-100 transition">
+            <details className="relative group">
+              <summary className="list-none cursor-pointer border border-emerald-700 text-emerald-700 px-4 py-2 rounded-full font-semibold hover:bg-emerald-100 transition [&::-webkit-details-marker]:hidden">
                 {displayName}
-              </button>
+              </summary>
 
-              <div className="hidden group-hover:block absolute right-0 top-full mt-0 w-56 bg-white border-2 border-emerald-700 rounded-lg shadow-xl p-5 z-50">
+              <div className="hidden group-open:block group-hover:block absolute left-0 md:left-auto md:right-0 top-full mt-0 w-56 max-w-[calc(100vw-2rem)] bg-white border-2 border-emerald-700 rounded-lg shadow-xl p-5 z-50">
                 <div className="flex flex-col gap-3 text-gray-700">
                   <Link href="/">Dashboard</Link>
                   {canUseAgent && (
@@ -109,7 +109,7 @@ export default async function Navbar() {
                   </form>
                 </div>
               </div>
-            </>
+            </details>
           )}
         </div>
       </div>
