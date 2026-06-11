@@ -1,6 +1,10 @@
 import { Suspense } from "react";
 import { canUseAgentFeatures, getAppSession } from "@/lib/auth";
-import { getListingsForViewer } from "@/lib/listings";
+import {
+  getListingsForViewer,
+  isListingReadError,
+} from "@/lib/listings";
+import ListingsUnavailable from "@/components/ListingsUnavailable";
 import ListingsContent from "./ListingsContent";
 
 export default async function ListingsPage({
@@ -11,10 +15,21 @@ export default async function ListingsPage({
   const session = await getAppSession();
   const currentSearchParams = await searchParams;
   const currentUserId = canUseAgentFeatures(session) ? session.user.id : null;
-  const properties = await getListingsForViewer(
-    session.role,
-    currentUserId ?? undefined
-  );
+  let properties;
+
+  try {
+    properties = await getListingsForViewer(
+      session.role,
+      currentUserId ?? undefined
+    );
+  } catch (error) {
+    if (isListingReadError(error)) {
+      return <ListingsUnavailable />;
+    }
+
+    throw error;
+  }
+
   const filterKey = JSON.stringify(currentSearchParams);
 
   return (

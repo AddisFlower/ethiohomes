@@ -52,6 +52,10 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Rejections store a rejection reason.
 - Owners can edit rejected listings to resubmit them for review.
 - Edit Listing includes owner delete action.
+- Owner-filtered deletes require Supabase to return the deleted row before the
+  API reports success.
+- Missing and non-owned delete attempts fail with a shared not-found/access
+  denial response instead of returning a false success.
 - Supabase Auth email/password login and signup.
 - Supabase Auth forgot-password and password-update flow.
 - Authenticated users without a valid `public.profiles` row enter an incomplete
@@ -71,6 +75,11 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Edit Listing uses Manage Photos file upload instead of raw image URL editing.
 - Successful login redirects to the dashboard.
 - Navbar and home listing presets apply real Browse filters.
+- Mobile navigation uses a compact menu with controlled dismissal behavior.
+- Mock listing fallback is restricted to non-production environments or
+  explicit demo mode.
+- Production listing-read failures log server-side context and render a clear
+  listings-unavailable state instead of silently showing demo data.
 
 ## Supabase Integration Status
 - Supabase/Postgres is the active persistence layer for listings.
@@ -99,11 +108,15 @@ Set these locally in `.env.local` and in Vercel project settings:
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
+# Optional: explicitly enable mock read fallback in a demo deployment.
+ETHIOMLS_ENABLE_MOCK_LISTINGS=true
 ```
 
 Important:
 - `NEXT_PUBLIC_SUPABASE_URL` must be the project root URL only, not `/rest/v1`.
 - Keep `SUPABASE_SERVICE_ROLE_KEY` server-only. Do not expose it in client code.
+- Do not set `ETHIOMLS_ENABLE_MOCK_LISTINGS` in production unless the deployment
+  is intentionally a demo environment.
 - Add the app's `/reset-password` URL to Supabase Auth redirect URLs for password recovery.
 - TODO: Configure custom SMTP and branded production email templates before launch.
 - For MVP auth, disable email confirmation in Supabase so login/signup flows work immediately.
@@ -314,11 +327,10 @@ These are the most urgent architecture and security requirements:
    - Why: Current application-route checks are not a sufficient database security boundary.
    - Dependencies: UUID ownership migration, finalized role semantics, and automated authorization tests.
 
-6. Remove or explicitly disable silent production fallback to mock listings.
-   - Mock fallback may remain available only in development or an explicit demo mode.
-   - Production read failures should surface a clear operational state and server logging.
-   - Why: Silent fallback can make outages look like valid data and could mix demo listings with real user expectations.
-   - Dependencies: Environment-aware configuration and basic error/health reporting.
+6. Maintain production-safe mock fallback behavior.
+   - Mock fallback is available only in development or an explicit demo mode.
+   - Production read failures surface a clear operational state and server logging.
+   - Do not reintroduce silent production fallback because outages could look like valid data and mix demo listings with real user expectations.
 
 7. Introduce client accounts only after the items above are complete.
    - Client accounts must not share listing ownership semantics with agents.
@@ -391,22 +403,32 @@ Current status:
 
 Top remaining recommendations by priority:
 1. Finish remaining UX bugs found in manual testing.
-2. Add automated authorization and visibility tests.
-3. Fix missing-profile role fallback so missing profiles never become agents.
-4. Migrate `owner_id` and `agent_owner_id` to proper UUID relationships.
-5. Implement RLS and user-scoped Supabase access.
-6. Remove or disable silent production fallback to mock data.
-7. Introduce client accounts.
-8. Add favorites, inquiry history, showing-request statuses, and multi-photo galleries.
+2. Prepare and migrate `owner_id` and `agent_owner_id` to proper UUID relationships.
+3. Prepare user-scoped Supabase helpers and RLS policy tests.
+4. Implement RLS only after UUID ownership and integration-test prerequisites are ready.
+5. Introduce client accounts.
+6. Add favorites, inquiry history, showing-request statuses, and multi-photo galleries.
 
 Recommended next implementation slice:
-- Finish any remaining manual-QA UX bugs, then add automated authorization and visibility tests before changing identity or RLS behavior.
+- Inventory legacy ownership values such as `agent-1` and `agent-2` in listings
+  and showing requests.
+- Define a deliberate mapping or removal strategy for demo ownership records
+  before changing columns to UUID foreign keys.
+- Document expected deletion/retention behavior for listings and showing
+  requests before adding foreign keys.
+- Prepare the ownership migration and rollback plan, then add migration-focused
+  tests before applying schema changes.
+- Keep this slice narrow: do not enable RLS or introduce client accounts while
+  ownership identities are still mixed.
 
 ## Known Limitations and Technical Debt
 - Create/update/delete use Supabase service role through server routes and should be revisited with RLS.
 - Auth is enforced in app route handlers and server pages; RLS is still disabled for this phase.
-- Reads silently fall back to mock data if Supabase fails, which helps local resilience but can hide production configuration issues.
+- Mock reads remain available in development and explicit demo mode. Production
+  fails closed unless `ETHIOMLS_ENABLE_MOCK_LISTINGS=true` is deliberately set.
 - Delete is currently a hard delete.
+- Owner-filtered delete verification is implemented, but deletion remains
+  permanent and does not preserve listing history.
 - Add Listing uses a fallback image when no primary image is uploaded.
 - Edit Listing displays the current image and routes replacements through `/listings/[id]/photos`.
 - Photo management supports one primary image only; galleries and ordering are future work.
@@ -441,10 +463,10 @@ Reason for postponing:
 
 ## Recommended Next Sequence
 1. Finish remaining UX bugs found in manual testing.
-2. Add automated authorization and visibility tests.
-3. Fix missing-profile role fallback.
-4. Migrate ownership IDs to UUIDs.
-5. Implement RLS and user-scoped Supabase access.
+2. Inventory and map legacy ownership values such as `agent-1` and `agent-2`.
+3. Migrate listing and showing-request ownership to UUID relationships.
+4. Separate service-role, anonymous, and authenticated-user Supabase request paths.
+5. Add RLS integration tests, then implement RLS.
 6. Introduce client accounts.
 7. Add favorites, inquiry history, showing-request statuses, and multi-photo galleries.
 
@@ -611,6 +633,47 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Keep MVP changes narrow and verify with `npm run lint`.
 
 ## Next Session Context
+- Production-safe listing read behavior is implemented:
+  - Development uses mock fallback when Supabase reads fail.
+  - Production fails closed by default.
+  - Explicit demo deployments can set
+    `ETHIOMLS_ENABLE_MOCK_LISTINGS=true`.
+  - Affected pages render a reusable listings-unavailable state.
+  - Read failures log operation context on the server.
+- Listing read tests cover successful Supabase reads, development fallback,
+  explicit production demo fallback, production failure, and missing
+  configuration.
+- The full Vitest suite passes with 35 tests.
+- `npm run build` passes.
+- Recommended next engineering task: inventory and map legacy ownership IDs
+  before preparing the UUID ownership migration.
+- Latest checkpoint commit: `1a9e85d Verify owner-filtered listing deletes`.
+- Owner-filtered Supabase deletes now use `Prefer: return=representation` and
+  require one returned row before reporting success.
+- Delete helper and route tests cover owned, non-owned, missing, and Supabase
+  failure outcomes.
+- The full Vitest suite passes with 30 tests. In restricted Windows sandboxes,
+  use `npx vitest run --configLoader runner` if the default esbuild config
+  loader cannot access the project path.
+- Manual delete verification passed:
+  - Signed-out requests return `401` with `Sign in required.`
+  - Signed-in missing or non-owned requests return `404` with
+    `Listing not found or access denied.`
+- Targeted lint and TypeScript checks pass for the delete slice.
+- Full-project lint still has pre-existing `react-hooks/set-state-in-effect`
+  errors in `app/reset-password/page.tsx` and existing raw `<img>` warnings.
+- Checkpoint commit: `ee2b232 Add auth tests and fail-closed profile handling`.
+- The checkpoint was committed and pushed before the user's break.
+- `npm run test` passes.
+- `npm run build` passes.
+- Missing-profile fail-closed behavior was manually tested successfully.
+- Vitest coverage now includes session authorization, listing visibility,
+  showing eligibility, protected API denials, and incomplete-user identity
+  handling for showing requests.
+- Authenticated users without a valid profile receive the `incomplete` role,
+  retain public browsing and logout, and receive no agent/admin privileges.
+- Login no longer creates or infers agent profiles. Explicit agent signup still
+  creates an agent profile.
 - Current app has Supabase listing persistence for CRUD.
 - Current app has Supabase Storage primary image uploads.
 - Current app has Supabase-backed admin approval/rejection with profile roles.
@@ -622,5 +685,6 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Supabase REST URL bug was diagnosed: `NEXT_PUBLIC_SUPABASE_URL` must not include `/rest/v1`.
 - User successfully tested adding a new home after Supabase setup.
 - Database-owned MLS ID generation is implemented through Postgres sequence/function.
-- Recommended next engineering task is to add Row Level Security policies.
-- Build command was previously blocked by an intermittent Windows sandbox `spawn setup refresh` error; lint passed with only existing `<img>` warnings.
+- UUID ownership migration must precede RLS implementation.
+- Do not enable RLS or introduce client accounts before the ownership migration
+  is prepared and tested.

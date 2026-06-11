@@ -1,4 +1,7 @@
-import { getListingById } from "@/lib/listings";
+import {
+  getListingById,
+  isListingReadError,
+} from "@/lib/listings";
 import {
   canManageListing,
   getAppSession,
@@ -8,6 +11,7 @@ import {
   canViewerBrowseListing,
   getShowingEligibility,
 } from "@/lib/listing-rules";
+import ListingsUnavailable from "@/components/ListingsUnavailable";
 import ListingDetailActions from "./ListingDetailActions";
 
 export default async function PropertyDetails({
@@ -16,8 +20,18 @@ export default async function PropertyDetails({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  let property;
 
-  const property = await getListingById(id);
+  try {
+    property = await getListingById(id);
+  } catch (error) {
+    if (isListingReadError(error)) {
+      return <ListingsUnavailable />;
+    }
+
+    throw error;
+  }
+
   const session = await getAppSession();
   const isOwner = property ? canManageListing(session, property) : false;
   const canViewListing =

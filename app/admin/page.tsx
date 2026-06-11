@@ -3,8 +3,11 @@ import { canUseAdminFeatures, getAppSession } from "@/lib/auth";
 import AgentProfileRequired from "@/components/AgentProfileRequired";
 import {
   type AdminListingStatusFilter,
+  type Property,
   getAdminListings,
+  isListingReadError,
 } from "@/lib/listings";
+import ListingsUnavailable from "@/components/ListingsUnavailable";
 import AdminApprovalActions from "./AdminApprovalActions";
 
 const statusFilters: AdminListingStatusFilter[] = [
@@ -66,7 +69,21 @@ export default async function AdminPage({
   const { status } = await searchParams;
   const activeStatus = getStatusFilter(status);
   const isAdmin = canUseAdminFeatures(session);
-  const listings = isAdmin ? await getAdminListings(activeStatus) : [];
+  let listings: Property[] = [];
+
+  if (isAdmin) {
+    try {
+      listings = await getAdminListings(activeStatus);
+    } catch (error) {
+      if (isListingReadError(error)) {
+        return (
+          <ListingsUnavailable description="The listing review queue could not be loaded. Please try again shortly." />
+        );
+      }
+
+      throw error;
+    }
+  }
 
   if (session.role === "incomplete") {
     return <AgentProfileRequired />;

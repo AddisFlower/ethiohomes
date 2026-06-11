@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { canUseAgentFeatures, getAppSession } from "@/lib/auth";
-import { getListingsByOwner } from "@/lib/listings";
+import {
+  getListingsByOwner,
+  isListingReadError,
+} from "@/lib/listings";
 import AgentProfileRequired from "@/components/AgentProfileRequired";
+import ListingsUnavailable from "@/components/ListingsUnavailable";
 
 export default async function MyListingsPage() {
   const session = await getAppSession();
@@ -15,7 +19,19 @@ export default async function MyListingsPage() {
     return <AgentProfileRequired />;
   }
 
-  const myListings = await getListingsByOwner(session.user.id);
+  let myListings;
+
+  try {
+    myListings = await getListingsByOwner(session.user.id);
+  } catch (error) {
+    if (isListingReadError(error)) {
+      return (
+        <ListingsUnavailable description="We could not load your listings right now. Please try again shortly." />
+      );
+    }
+
+    throw error;
+  }
 
   return (
     <main className="min-h-screen bg-gray-100 py-12 px-6">

@@ -80,6 +80,47 @@ const fallbackImage =
 const listingImagesBucket = "listing-images";
 export const listingNotFoundOrDeniedMessage =
   "Listing not found or access denied.";
+export const listingsUnavailableMessage =
+  "Listings are temporarily unavailable. Please try again later.";
+
+export class ListingReadError extends Error {
+  constructor(operation: string, cause: unknown) {
+    super(listingsUnavailableMessage, { cause });
+    this.name = "ListingReadError";
+    this.operation = operation;
+  }
+
+  operation: string;
+}
+
+export function isListingReadError(error: unknown): error is ListingReadError {
+  return error instanceof ListingReadError;
+}
+
+export function isMockListingFallbackEnabled() {
+  return (
+    process.env.NODE_ENV !== "production" ||
+    process.env.ETHIOMLS_ENABLE_MOCK_LISTINGS === "true"
+  );
+}
+
+async function readListingsWithFallback<T>(
+  operation: string,
+  read: () => Promise<T>,
+  fallback: () => T
+) {
+  try {
+    return await read();
+  } catch (error) {
+    console.error(`[EthioMLS] ${operation} failed.`, error);
+
+    if (isMockListingFallbackEnabled()) {
+      return fallback();
+    }
+
+    throw new ListingReadError(operation, error);
+  }
+}
 
 function toMarketStatus(value: string | null | undefined): MarketStatus {
   if (marketStatuses.includes(value as MarketStatus)) {
@@ -339,15 +380,17 @@ async function assertListingOwner(id: string, ownerId: string) {
 }
 
 export async function getListings(): Promise<Property[]> {
-  try {
-    const rows = await supabaseRequest<ListingRow[]>(
-      "/listings?select=*&approval_status=eq.Approved&order=id.asc"
-    );
+  return readListingsWithFallback(
+    "Load public listings",
+    async () => {
+      const rows = await supabaseRequest<ListingRow[]>(
+        "/listings?select=*&approval_status=eq.Approved&order=id.asc"
+      );
 
-    return rows.map(toProperty).filter(isPubliclyVisibleListing);
-  } catch {
-    return mockProperties.filter(isPubliclyVisibleListing);
-  }
+      return rows.map(toProperty).filter(isPubliclyVisibleListing);
+    },
+    () => mockProperties.filter(isPubliclyVisibleListing)
+  );
 }
 
 export async function getListingsForViewer(
@@ -355,58 +398,67 @@ export async function getListingsForViewer(
   userId?: string
 ): Promise<Property[]> {
   if (role === "admin") {
-    try {
-      const rows = await supabaseRequest<ListingRow[]>(
-        "/listings?select=*&order=updated_at.desc"
-      );
+    return readListingsWithFallback(
+      "Load listings for admin viewer",
+      async () => {
+        const rows = await supabaseRequest<ListingRow[]>(
+          "/listings?select=*&order=updated_at.desc"
+        );
 
-      return rows.map(toProperty);
-    } catch {
-      return mockProperties;
-    }
+        return rows.map(toProperty);
+      },
+      () => mockProperties
+    );
   }
 
   if (role === "agent" && userId) {
-    try {
-      const rows = await supabaseRequest<ListingRow[]>(
-        "/listings?select=*&order=updated_at.desc"
-      );
+    return readListingsWithFallback(
+      "Load listings for agent viewer",
+      async () => {
+        const rows = await supabaseRequest<ListingRow[]>(
+          "/listings?select=*&order=updated_at.desc"
+        );
 
-      return rows
-        .map(toProperty)
-        .filter((listing) => canAgentBrowseListing(listing, userId));
-    } catch {
-      return mockProperties.filter((listing) =>
-        canAgentBrowseListing(listing, userId)
-      );
-    }
+        return rows
+          .map(toProperty)
+          .filter((listing) => canAgentBrowseListing(listing, userId));
+      },
+      () =>
+        mockProperties.filter((listing) =>
+          canAgentBrowseListing(listing, userId)
+        )
+    );
   }
 
   return getListings();
 }
 
 export async function getListingById(id: string): Promise<Property | null> {
-  try {
-    const rows = await supabaseRequest<ListingRow[]>(
-      `/listings?select=*&id=eq.${encodeURIComponent(id)}&limit=1`
-    );
+  return readListingsWithFallback(
+    "Load listing detail",
+    async () => {
+      const rows = await supabaseRequest<ListingRow[]>(
+        `/listings?select=*&id=eq.${encodeURIComponent(id)}&limit=1`
+      );
 
-    return rows[0] ? toProperty(rows[0]) : null;
-  } catch {
-    return mockProperties.find((property) => property.id === id) ?? null;
-  }
+      return rows[0] ? toProperty(rows[0]) : null;
+    },
+    () => mockProperties.find((property) => property.id === id) ?? null
+  );
 }
 
 export async function getListingsByOwner(ownerId: string): Promise<Property[]> {
-  try {
-    const rows = await supabaseRequest<ListingRow[]>(
-      `/listings?select=*&owner_id=eq.${encodeURIComponent(ownerId)}&order=id.asc`
-    );
+  return readListingsWithFallback(
+    "Load listings by owner",
+    async () => {
+      const rows = await supabaseRequest<ListingRow[]>(
+        `/listings?select=*&owner_id=eq.${encodeURIComponent(ownerId)}&order=id.asc`
+      );
 
-    return rows.map(toProperty);
-  } catch {
-    return mockProperties.filter((property) => property.ownerId === ownerId);
-  }
+      return rows.map(toProperty);
+    },
+    () => mockProperties.filter((property) => property.ownerId === ownerId)
+  );
 }
 
 export type AdminListingStatusFilter =
@@ -422,11 +474,22 @@ export async function getAdminListings(
     status === "All"
       ? ""
       : `&approval_status=eq.${encodeURIComponent(status)}`;
-  const rows = await supabaseRequest<ListingRow[]>(
-    `/listings?select=*${statusFilter}&order=updated_at.desc`
-  );
+  return readListingsWithFallback(
+    "Load admin review listings",
+    async () => {
+      const rows = await supabaseRequest<ListingRow[]>(
+        `/listings?select=*${statusFilter}&order=updated_at.desc`
+      );
 
-  return rows.map(toProperty);
+      return rows.map(toProperty);
+    },
+    () =>
+      status === "All"
+        ? mockProperties
+        : mockProperties.filter(
+            (listing) => listing.approvalStatus === status
+          )
+  );
 }
 
 export async function createListing(

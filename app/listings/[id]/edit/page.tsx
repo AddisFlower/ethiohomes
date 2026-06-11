@@ -1,6 +1,10 @@
-import { getListingById } from "@/lib/listings";
+import {
+  getListingById,
+  isListingReadError,
+} from "@/lib/listings";
 import { canManageListing, getAppSession } from "@/lib/auth";
 import AgentProfileRequired from "@/components/AgentProfileRequired";
+import ListingsUnavailable from "@/components/ListingsUnavailable";
 import EditListingForm from "./EditListingForm";
 import { redirect } from "next/navigation";
 
@@ -18,7 +22,20 @@ export default async function EditListingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const property = await getListingById(id);
+  let property;
+
+  try {
+    property = await getListingById(id);
+  } catch (error) {
+    if (isListingReadError(error)) {
+      return (
+        <ListingsUnavailable description="This listing could not be loaded for editing. Please try again shortly." />
+      );
+    }
+
+    throw error;
+  }
+
   const session = await getAppSession();
 
   if (!property) {
