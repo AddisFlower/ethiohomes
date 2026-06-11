@@ -68,11 +68,19 @@ type ListingOwnerRow = {
   owner_id: string;
 };
 
+type DeletedListingRow = {
+  id: string;
+  owner_id: string;
+};
+
 export type { ApprovalStatus, MarketStatus, TransactionType };
 
 const fallbackImage =
   "https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1200&auto=format&fit=crop";
 const listingImagesBucket = "listing-images";
+export const listingNotFoundOrDeniedMessage =
+  "Listing not found or access denied.";
+
 function toMarketStatus(value: string | null | undefined): MarketStatus {
   if (marketStatuses.includes(value as MarketStatus)) {
     return value as MarketStatus;
@@ -573,12 +581,21 @@ export async function updateListing(
 }
 
 export async function deleteListing(id: string, ownerId: string) {
-  await supabaseRequest(
+  const rows = await supabaseRequest<DeletedListingRow[]>(
     `/listings?id=eq.${encodeURIComponent(id)}&owner_id=eq.${encodeURIComponent(
       ownerId
     )}`,
     {
       method: "DELETE",
+      headers: {
+        Prefer: "return=representation",
+      },
     }
   );
+
+  if (!rows[0]) {
+    throw new Error(listingNotFoundOrDeniedMessage);
+  }
+
+  return rows[0];
 }

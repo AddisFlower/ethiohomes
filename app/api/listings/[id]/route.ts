@@ -4,7 +4,11 @@ import {
   getAgentAccessDenial,
   getAppSession,
 } from "@/lib/auth";
-import { deleteListing, updateListing } from "@/lib/listings";
+import {
+  deleteListing,
+  listingNotFoundOrDeniedMessage,
+  updateListing,
+} from "@/lib/listings";
 
 export async function PUT(
   request: Request,
@@ -62,14 +66,16 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to delete listing.";
+
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to delete listing.",
+        error: message,
       },
-      { status: 500 }
+      {
+        status: message === listingNotFoundOrDeniedMessage ? 404 : 500,
+      }
     );
   }
 }

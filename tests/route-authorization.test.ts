@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  agentSession,
   incompleteSession,
   publicSession,
 } from "@/tests/fixtures/auth";
@@ -28,6 +29,7 @@ vi.mock("@/lib/auth", async () => {
 vi.mock("@/lib/listings", () => ({
   createListing: mocks.createListing,
   deleteListing: mocks.deleteListing,
+  listingNotFoundOrDeniedMessage: "Listing not found or access denied.",
   updateListing: mocks.updateListing,
   updateListingApproval: mocks.updateListingApproval,
   updateListingPhoto: mocks.updateListingPhoto,
@@ -119,6 +121,73 @@ describe("protected listing route authorization", () => {
       error: "Agent profile required.",
     });
     expect(mocks.updateListingApproval).not.toHaveBeenCalled();
+  });
+});
+
+describe("listing DELETE route", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getAppSession.mockResolvedValue(agentSession);
+  });
+
+  it("returns success only after the owned listing helper succeeds", async () => {
+    mocks.deleteListing.mockResolvedValue({
+      id: "listing-1",
+      owner_id: agentSession.user.id,
+    });
+
+    const response = await deleteListing(
+      new Request("http://localhost/api/listings/listing-1", {
+        method: "DELETE",
+      }),
+      routeContext
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
+    expect(mocks.deleteListing).toHaveBeenCalledWith(
+      "listing-1",
+      agentSession.user.id
+    );
+  });
+
+  it.each(["non-owned", "missing"])(
+    "returns 404 when the %s listing matches no owner-filtered row",
+    async () => {
+      mocks.deleteListing.mockRejectedValue(
+        new Error("Listing not found or access denied.")
+      );
+
+      const response = await deleteListing(
+        new Request("http://localhost/api/listings/listing-1", {
+          method: "DELETE",
+        }),
+        routeContext
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        error: "Listing not found or access denied.",
+      });
+    }
+  );
+
+  it("returns 500 when Supabase fails", async () => {
+    mocks.deleteListing.mockRejectedValue(
+      new Error("Supabase delete failed.")
+    );
+
+    const response = await deleteListing(
+      new Request("http://localhost/api/listings/listing-1", {
+        method: "DELETE",
+      }),
+      routeContext
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Supabase delete failed.",
+    });
   });
 });
 
