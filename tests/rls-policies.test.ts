@@ -62,7 +62,7 @@ describe("RLS policy migration contract", () => {
       /policy listings_select_public[\s\S]*approval_status = 'Approved'[\s\S]*market_status in \('Coming Soon', 'Active', 'Pending', 'Closed'\)/i
     );
     expect(policies).toMatch(
-      /policy listings_select_authenticated[\s\S]*owner_id = auth\.uid\(\)[\s\S]*market_status = 'Off Market'[\s\S]*ethiomls_private\.is_admin\(\)/i
+      /policy listings_select_authenticated[\s\S]*owner_id = auth\.uid\(\)[\s\S]*approval_status = 'Approved'[\s\S]*market_status = 'Off Market'[\s\S]*ethiomls_private\.is_admin\(\)/i
     );
   });
 

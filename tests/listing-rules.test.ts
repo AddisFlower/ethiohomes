@@ -42,7 +42,7 @@ describe("listing visibility policies", () => {
     ).toBe(false);
   });
 
-  it("lets agents browse owned, public, and other-agent Off Market listings", () => {
+  it("lets agents browse owned, public, and approved other-agent Off Market listings", () => {
     expect(
       canAgentBrowseListing(
         createListingFixture({
@@ -61,7 +61,7 @@ describe("listing visibility policies", () => {
     expect(
       canAgentBrowseListing(
         createListingFixture({
-          approvalStatus: "Rejected",
+          approvalStatus: "Approved",
           marketStatus: "Off Market",
           ownerId: otherAuthUser.id,
         }),
@@ -81,6 +81,21 @@ describe("listing visibility policies", () => {
         authUser.id
       )
     ).toBe(false);
+  });
+
+  it("hides another agent's Unapproved or Rejected Off Market listing", () => {
+    for (const approvalStatus of ["Unapproved", "Rejected"] as const) {
+      expect(
+        canAgentBrowseListing(
+          createListingFixture({
+            approvalStatus,
+            marketStatus: "Off Market",
+            ownerId: otherAuthUser.id,
+          }),
+          authUser.id
+        )
+      ).toBe(false);
+    }
   });
 
   it("treats incomplete users as public viewers and admins as global viewers", () => {

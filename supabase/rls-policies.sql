@@ -153,7 +153,10 @@ using (
     (select ethiomls_private.is_agent_or_admin())
     and (
       owner_id = auth.uid()
-      or market_status = 'Off Market'
+      or (
+        approval_status = 'Approved'
+        and market_status = 'Off Market'
+      )
     )
   )
   or (select ethiomls_private.is_admin())

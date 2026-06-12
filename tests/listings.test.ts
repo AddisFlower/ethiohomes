@@ -211,11 +211,21 @@ describe("listing credential routing", () => {
     await getListingsByOwner(authUser.id, "user-access-token");
 
     expect(mocks.authenticatedSupabaseRequest).toHaveBeenCalledWith(
-      `/listings?select=*&owner_id=eq.${authUser.id}&order=id.asc`,
+      `/listings?select=*&owner_id=eq.${authUser.id}&order=created_at.desc`,
       "user-access-token"
     );
     expect(mocks.anonymousSupabaseRequest).not.toHaveBeenCalled();
     expect(mocks.serviceRoleSupabaseRequest).not.toHaveBeenCalled();
+  });
+
+  it("requests public listings newest first by upload date", async () => {
+    mocks.anonymousSupabaseRequest.mockResolvedValue([approvedListingRow]);
+
+    await getListings();
+
+    expect(mocks.anonymousSupabaseRequest).toHaveBeenCalledWith(
+      "/listings?select=*&approval_status=eq.Approved&order=created_at.desc"
+    );
   });
 
   it("fails closed when an agent listing read has no user token", async () => {

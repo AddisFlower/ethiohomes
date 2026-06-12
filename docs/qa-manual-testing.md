@@ -35,6 +35,9 @@ Sign out before each public test.
 5. Confirm Approved + Off Market is absent and its direct detail URL is hidden.
 6. Confirm Unapproved listings are absent for every market status.
 7. Confirm Rejected listings are absent for every market status.
+8. Confirm listing collections show the newest `created_at` rows first.
+9. Edit an older listing and confirm the edit does not move it above a newer
+   listing.
 
 ## Agent Visibility
 
@@ -43,8 +46,9 @@ Use two agent accounts, Agent A and Agent B.
 1. As Agent A, confirm all Agent A listings appear regardless of approval or market status.
 2. Confirm Agent A can open direct detail URLs for all owned listings.
 3. Confirm Agent A sees Agent B's publicly visible listings.
-4. Confirm Agent A sees Agent B's Off Market listings.
-5. Confirm Agent A does not see Agent B's Unapproved or Rejected listings unless they are Off Market.
+4. Confirm Agent A sees Agent B's Approved + Off Market listings.
+5. Confirm Agent A does not see Agent B's Unapproved or Rejected listings,
+   including Off Market listings.
 6. Confirm Agent A cannot edit or manage photos for Agent B's listings.
 
 ## Admin Visibility

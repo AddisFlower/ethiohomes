@@ -76,6 +76,7 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Last Updated display now uses the database-owned `updated_at` timestamp instead of storing generated display text.
 - Live dashboard counts link to My Listings, Showing Requests, and the admin Unapproved queue.
 - Listing visibility is role-aware for public visitors, agents, owners, and admins.
+- Listing collections default to newest uploaded first using `created_at`.
 - Showing requests are limited to Approved + Active listings in both UI and server logic.
 - Residential room fields are required; Land stores null rooms; Commercial/Office use optional bathrooms and null bedrooms.
 - Add Listing excludes Pending and Closed; Edit Listing supports the full market lifecycle.
@@ -274,7 +275,10 @@ Seed data:
 - Editing a rejected listing resubmits it by setting `approval_status = Unapproved` and clearing `rejection_reason`.
 - Public browse/detail shows only `approval_status = Approved` listings with `market_status` in `Coming Soon`, `Active`, `Pending`, or `Closed`.
 - Public browse/detail hides Unapproved listings, Rejected listings, and Off Market listings.
-- Authenticated agents can browse public-visible listings plus Off Market listings from other agents.
+- Authenticated agents can browse public-visible listings plus Approved + Off
+  Market listings from other agents.
+- Unapproved and Rejected listings are hidden from unrelated agents regardless
+  of market status.
 - Owners can always browse and open all of their own listings regardless of approval or market status.
 - Admins can browse and open all listings.
 - Closed listings remain publicly visible.

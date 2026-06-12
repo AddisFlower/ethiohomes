@@ -92,7 +92,8 @@ export function canAgentBrowseListing(
 ) {
   return (
     listing.ownerId === userId ||
-    listing.marketStatus === "Off Market" ||
+    (listing.approvalStatus === "Approved" &&
+      listing.marketStatus === "Off Market") ||
     isPubliclyVisibleListing(listing)
   );
 }

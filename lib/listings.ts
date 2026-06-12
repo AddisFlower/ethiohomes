@@ -124,6 +124,10 @@ async function readListingsWithFallback<T>(
   }
 }
 
+function newestMockListingsFirst(listings: Property[]) {
+  return [...listings].reverse();
+}
+
 function toMarketStatus(value: string | null | undefined): MarketStatus {
   if (marketStatuses.includes(value as MarketStatus)) {
     return value as MarketStatus;
@@ -391,12 +395,15 @@ export async function getListings(): Promise<Property[]> {
     "Load public listings",
     async () => {
       const rows = await anonymousSupabaseRequest<ListingRow[]>(
-        "/listings?select=*&approval_status=eq.Approved&order=id.asc"
+        "/listings?select=*&approval_status=eq.Approved&order=created_at.desc"
       );
 
       return rows.map(toProperty).filter(isPubliclyVisibleListing);
     },
-    () => mockProperties.filter(isPubliclyVisibleListing)
+    () =>
+      newestMockListingsFirst(
+        mockProperties.filter(isPubliclyVisibleListing)
+      )
   );
 }
 
@@ -418,13 +425,13 @@ export async function getListingsForViewer(
       "Load listings for admin viewer",
       async () => {
         const rows = await authenticatedSupabaseRequest<ListingRow[]>(
-          "/listings?select=*&order=updated_at.desc",
+          "/listings?select=*&order=created_at.desc",
           accessToken
         );
 
         return rows.map(toProperty);
       },
-      () => mockProperties
+      () => newestMockListingsFirst(mockProperties)
     );
   }
 
@@ -433,7 +440,7 @@ export async function getListingsForViewer(
       "Load listings for agent viewer",
       async () => {
         const rows = await authenticatedSupabaseRequest<ListingRow[]>(
-          "/listings?select=*&order=updated_at.desc",
+          "/listings?select=*&order=created_at.desc",
           accessToken
         );
 
@@ -442,8 +449,10 @@ export async function getListingsForViewer(
           .filter((listing) => canAgentBrowseListing(listing, userId));
       },
       () =>
-        mockProperties.filter((listing) =>
-          canAgentBrowseListing(listing, userId)
+        newestMockListingsFirst(
+          mockProperties.filter((listing) =>
+            canAgentBrowseListing(listing, userId)
+          )
         )
     );
   }
@@ -477,13 +486,16 @@ export async function getListingsByOwner(
     "Load listings by owner",
     async () => {
       const rows = await authenticatedSupabaseRequest<ListingRow[]>(
-        `/listings?select=*&owner_id=eq.${encodeURIComponent(ownerId)}&order=id.asc`,
+        `/listings?select=*&owner_id=eq.${encodeURIComponent(ownerId)}&order=created_at.desc`,
         accessToken
       );
 
       return rows.map(toProperty);
     },
-    () => mockProperties.filter((property) => property.ownerId === ownerId)
+    () =>
+      newestMockListingsFirst(
+        mockProperties.filter((property) => property.ownerId === ownerId)
+      )
   );
 }
 
@@ -505,7 +517,7 @@ export async function getAdminListings(
     "Load admin review listings",
     async () => {
       const rows = await authenticatedSupabaseRequest<ListingRow[]>(
-        `/listings?select=*${statusFilter}&order=updated_at.desc`,
+        `/listings?select=*${statusFilter}&order=created_at.desc`,
         accessToken
       );
 
@@ -513,9 +525,11 @@ export async function getAdminListings(
     },
     () =>
       status === "All"
-        ? mockProperties
-        : mockProperties.filter(
-            (listing) => listing.approvalStatus === status
+        ? newestMockListingsFirst(mockProperties)
+        : newestMockListingsFirst(
+            mockProperties.filter(
+              (listing) => listing.approvalStatus === status
+            )
           )
   );
 }

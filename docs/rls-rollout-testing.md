@@ -74,8 +74,10 @@ covering:
 ### Agent A
 
 1. Confirm Agent A sees all owned listings.
-2. Confirm Agent A sees public listings and Agent B's Off Market listings.
-3. Confirm Agent A cannot see Agent B's Unapproved or Rejected Active listings.
+2. Confirm Agent A sees public listings and Agent B's Approved + Off Market
+   listings.
+3. Confirm Agent A cannot see Agent B's Unapproved or Rejected listings,
+   including Off Market listings.
 4. Create a listing and confirm it is forced to Unapproved and owned by
    Agent A.
 5. Edit and replace the photo on an owned listing.
