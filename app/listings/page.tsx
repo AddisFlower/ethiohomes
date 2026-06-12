@@ -20,7 +20,8 @@ export default async function ListingsPage({
   try {
     properties = await getListingsForViewer(
       session.role,
-      currentUserId ?? undefined
+      currentUserId ?? undefined,
+      session.role === "public" ? undefined : session.accessToken
     );
   } catch (error) {
     if (isListingReadError(error)) {

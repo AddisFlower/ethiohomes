@@ -28,7 +28,12 @@ export async function PUT(
 
     const { id } = await params;
     const formData = await request.formData();
-    const listing = await updateListing(id, formData, agentSession.user.id);
+    const listing = await updateListing(
+      id,
+      formData,
+      agentSession.user.id,
+      agentSession.accessToken
+    );
 
     return NextResponse.json({ listing });
   } catch (error) {
@@ -62,7 +67,11 @@ export async function DELETE(
 
     const { id } = await params;
     // TODO: Replace this hard delete with soft delete if listing recovery is needed.
-    await deleteListing(id, agentSession.user.id);
+    await deleteListing(
+      id,
+      agentSession.user.id,
+      agentSession.accessToken
+    );
 
     return NextResponse.json({ ok: true });
   } catch (error) {

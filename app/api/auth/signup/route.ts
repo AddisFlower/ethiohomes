@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getFriendlyAuthError, logAuthError } from "@/lib/auth-errors";
 import { getAuthCookieNames } from "@/lib/auth";
-import { getSupabaseConfig, supabaseRequest } from "@/lib/supabase";
+import {
+  getSupabaseConfig,
+  serviceRoleSupabaseRequest,
+} from "@/lib/supabase";
 
 type SignupBody = {
   agencyName?: string;
@@ -44,7 +47,7 @@ export async function POST(request: Request) {
     const authResponse = await fetch(`${config.authUrl}/signup`, {
       method: "POST",
       headers: {
-        apikey: config.key,
+        apikey: config.anonKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -83,7 +86,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await supabaseRequest("/profiles?on_conflict=id", {
+    await serviceRoleSupabaseRequest("/profiles?on_conflict=id", {
       method: "POST",
       headers: {
         Prefer: "resolution=merge-duplicates,return=representation",

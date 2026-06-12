@@ -1,5 +1,7 @@
 import type { AppSession, AuthUser, Profile } from "@/lib/auth";
 
+export const accessToken = "test-user-access-token";
+
 export const authUser: AuthUser = {
   id: "00000000-0000-4000-8000-000000000001",
   email: "agent@example.com",
@@ -32,16 +34,19 @@ export const incompleteSession: AppSession = {
   role: "incomplete",
   user: authUser,
   profile: null,
+  accessToken,
 };
 
 export const agentSession: AppSession = {
   role: "agent",
   user: authUser,
   profile: agentProfile,
+  accessToken,
 };
 
 export const adminSession: AppSession = {
   role: "admin",
   user: authUser,
   profile: adminProfile,
+  accessToken,
 };

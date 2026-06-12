@@ -22,10 +22,16 @@ export default async function EditListingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const session = await getAppSession();
+
+  if (session.role === "public") {
+    redirect("/login");
+  }
+
   let property;
 
   try {
-    property = await getListingById(id);
+    property = await getListingById(id, session.accessToken);
   } catch (error) {
     if (isListingReadError(error)) {
       return (
@@ -35,8 +41,6 @@ export default async function EditListingPage({
 
     throw error;
   }
-
-  const session = await getAppSession();
 
   if (!property) {
     return (
@@ -52,10 +56,6 @@ export default async function EditListingPage({
         </div>
       </main>
     );
-  }
-
-  if (session.role === "public") {
-    redirect("/login");
   }
 
   if (session.role === "incomplete") {

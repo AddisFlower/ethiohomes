@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const updateResponse = await fetch(`${config.authUrl}/user`, {
       method: "PUT",
       headers: {
-        apikey: config.key,
+        apikey: config.anonKey,
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },

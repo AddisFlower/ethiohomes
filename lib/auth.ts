@@ -1,5 +1,8 @@
 import { cookies } from "next/headers";
-import { getSupabaseConfig, supabaseRequest } from "@/lib/supabase";
+import {
+  authenticatedSupabaseRequest,
+  getSupabaseConfig,
+} from "@/lib/supabase";
 
 export type AppRole = "public" | "incomplete" | "agent" | "admin";
 
@@ -29,11 +32,19 @@ export type AppSession =
       role: "incomplete";
       user: AuthUser;
       profile: null;
+      accessToken: string;
     }
   | {
-      role: "agent" | "admin";
+      role: "agent";
       user: AuthUser;
-      profile: Profile;
+      profile: Profile & { role: "agent" };
+      accessToken: string;
+    }
+  | {
+      role: "admin";
+      user: AuthUser;
+      profile: Profile & { role: "admin" };
+      accessToken: string;
     };
 
 export type AuthenticatedSession = Exclude<AppSession, { role: "public" }>;
@@ -79,7 +90,7 @@ async function getCurrentUser(accessToken: string) {
 
   const response = await fetch(`${config.authUrl}/user`, {
     headers: {
-      apikey: config.key,
+      apikey: config.anonKey,
       Authorization: `Bearer ${accessToken}`,
     },
     cache: "no-store",
@@ -98,12 +109,13 @@ async function getCurrentUser(accessToken: string) {
   };
 }
 
-export async function getProfile(userId: string) {
+export async function getProfile(userId: string, accessToken: string) {
   try {
-    const rows = await supabaseRequest<
+    const rows = await authenticatedSupabaseRequest<
       Array<Omit<Profile, "role"> & { role: string }>
     >(
-      `/profiles?select=*&id=eq.${encodeURIComponent(userId)}&limit=1`
+      `/profiles?select=*&id=eq.${encodeURIComponent(userId)}&limit=1`,
+      accessToken
     );
     const profile = rows[0];
 
@@ -130,20 +142,32 @@ export async function getProfile(userId: string) {
 
 export function createAuthenticatedSession(
   user: AuthUser,
-  profile: Profile | null
+  profile: Profile | null,
+  accessToken: string
 ): AuthenticatedSession {
   if (!profile) {
     return {
       role: "incomplete",
       user,
       profile: null,
+      accessToken,
+    };
+  }
+
+  if (profile.role === "admin") {
+    return {
+      role: "admin",
+      user,
+      profile: { ...profile, role: "admin" },
+      accessToken,
     };
   }
 
   return {
-    role: profile.role,
+    role: "agent",
     user,
-    profile,
+    profile: { ...profile, role: "agent" },
+    accessToken,
   };
 }
 
@@ -168,7 +192,11 @@ export async function getAppSession(): Promise<AppSession> {
     };
   }
 
-  return createAuthenticatedSession(user, await getProfile(user.id));
+  return createAuthenticatedSession(
+    user,
+    await getProfile(user.id, accessToken),
+    accessToken
+  );
 }
 
 export function isAuthenticated(

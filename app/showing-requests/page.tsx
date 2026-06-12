@@ -45,7 +45,10 @@ export default async function ShowingRequestsPage() {
     return <AgentProfileRequired />;
   }
 
-  const requests = await getShowingRequests(session.user.id);
+  const requests = await getShowingRequests(
+    session.user.id,
+    session.accessToken
+  );
 
   return (
     <main className="min-h-screen bg-gray-100 py-12 px-6">

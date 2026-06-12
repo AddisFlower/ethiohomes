@@ -11,16 +11,30 @@ import HomeContent from "./HomeContent";
 
 export default async function Home() {
   const session = await getAppSession();
-  const isAgent = canUseAgentFeatures(session);
-  const isAdmin = canUseAdminFeatures(session);
+  const agentSession = canUseAgentFeatures(session) ? session : null;
+  const adminSession = canUseAdminFeatures(session) ? session : null;
+  const isAgent = agentSession !== null;
+  const isAdmin = adminSession !== null;
   let dashboardData;
 
   try {
     dashboardData = await Promise.all([
       getListings(),
-      isAgent ? getListingsByOwner(session.user.id) : Promise.resolve([]),
-      isAgent ? getShowingRequests(session.user.id) : Promise.resolve([]),
-      isAdmin ? getAdminListings("Unapproved") : Promise.resolve([]),
+      agentSession
+        ? getListingsByOwner(
+            agentSession.user.id,
+            agentSession.accessToken
+          )
+        : Promise.resolve([]),
+      agentSession
+        ? getShowingRequests(
+            agentSession.user.id,
+            agentSession.accessToken
+          )
+        : Promise.resolve([]),
+      adminSession
+        ? getAdminListings(adminSession.accessToken, "Unapproved")
+        : Promise.resolve([]),
     ]);
   } catch (error) {
     if (isListingReadError(error)) {

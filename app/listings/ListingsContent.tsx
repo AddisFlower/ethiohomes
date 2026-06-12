@@ -39,7 +39,10 @@ export default function ListingsContent({
   const [showingListing, setShowingListing] = useState<Property | null>(null);
   const [showingError, setShowingError] = useState("");
   const [showingLoading, setShowingLoading] = useState(false);
-  const [showingSuccessId, setShowingSuccessId] = useState<string | null>(null);
+  const [showingSuccess, setShowingSuccess] = useState<{
+    agentContactEmail: string | null;
+    listingId: string;
+  } | null>(null);
 
   async function handleShowingSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,7 +81,11 @@ export default function ListingsContent({
         return;
       }
 
-      setShowingSuccessId(showingListing.id);
+      const result = await response.json();
+      setShowingSuccess({
+        agentContactEmail: result.agentContactEmail ?? null,
+        listingId: showingListing.id,
+      });
       setShowingListing(null);
     } finally {
       setShowingLoading(false);
@@ -249,12 +256,24 @@ export default function ListingsContent({
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    {showingSuccessId === property.id && (
+                    {showingSuccess?.listingId === property.id && (
                       <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
                         <p className="font-semibold">Showing request sent.</p>
                         <p className="text-sm">
                           The listing agent can now follow up with you.
                         </p>
+                        {showingSuccess.agentContactEmail && (
+                          <p className="mt-2 text-sm">
+                            Feel free to contact the agent at{" "}
+                            <a
+                              href={`mailto:${showingSuccess.agentContactEmail}`}
+                              className="font-semibold underline hover:text-emerald-700"
+                            >
+                              {showingSuccess.agentContactEmail}
+                            </a>
+                            .
+                          </p>
+                        )}
                       </div>
                     )}
 

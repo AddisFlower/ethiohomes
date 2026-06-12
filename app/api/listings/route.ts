@@ -25,7 +25,8 @@ export async function POST(request: Request) {
       agentSession.user.id,
       agentSession.profile.full_name ??
         agentSession.user.email ??
-        "EthioMLS Agent"
+        "EthioMLS Agent",
+      agentSession.accessToken
     );
 
     return NextResponse.json({ listing });

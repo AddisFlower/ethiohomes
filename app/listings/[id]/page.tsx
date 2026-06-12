@@ -20,10 +20,14 @@ export default async function PropertyDetails({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const session = await getAppSession();
   let property;
 
   try {
-    property = await getListingById(id);
+    property = await getListingById(
+      id,
+      isAuthenticated(session) ? session.accessToken : undefined
+    );
   } catch (error) {
     if (isListingReadError(error)) {
       return <ListingsUnavailable />;
@@ -32,7 +36,6 @@ export default async function PropertyDetails({
     throw error;
   }
 
-  const session = await getAppSession();
   const isOwner = property ? canManageListing(session, property) : false;
   const canViewListing =
     property &&

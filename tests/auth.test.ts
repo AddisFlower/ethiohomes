@@ -13,6 +13,7 @@ import {
   adminSession,
   agentProfile,
   agentSession,
+  accessToken,
   authUser,
   incompleteSession,
   publicSession,
@@ -20,16 +21,20 @@ import {
 
 describe("authorization session policies", () => {
   it("creates an incomplete session when an authenticated user has no profile", () => {
-    expect(createAuthenticatedSession(authUser, null)).toEqual(
+    expect(createAuthenticatedSession(authUser, null, accessToken)).toEqual(
       incompleteSession
     );
   });
 
   it("uses valid agent and admin profiles without changing their roles", () => {
-    expect(createAuthenticatedSession(authUser, agentProfile)).toEqual(
+    expect(
+      createAuthenticatedSession(authUser, agentProfile, accessToken)
+    ).toEqual(
       agentSession
     );
-    expect(createAuthenticatedSession(authUser, adminProfile)).toEqual(
+    expect(
+      createAuthenticatedSession(authUser, adminProfile, accessToken)
+    ).toEqual(
       adminSession
     );
   });

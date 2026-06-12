@@ -27,7 +27,8 @@ export async function PUT(
     const listing = await updateListingPhoto(
       id,
       formData,
-      agentSession.user.id
+      agentSession.user.id,
+      agentSession.accessToken
     );
 
     return NextResponse.json({ listing });

@@ -71,9 +71,9 @@ export default async function AdminPage({
   const isAdmin = canUseAdminFeatures(session);
   let listings: Property[] = [];
 
-  if (isAdmin) {
+  if (session.role === "admin") {
     try {
-      listings = await getAdminListings(activeStatus);
+      listings = await getAdminListings(session.accessToken, activeStatus);
     } catch (error) {
       if (isListingReadError(error)) {
         return (

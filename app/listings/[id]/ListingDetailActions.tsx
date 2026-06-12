@@ -20,6 +20,9 @@ export default function ListingDetailActions({
 }: ListingDetailActionsProps) {
   const router = useRouter();
   const [showingRequested, setShowingRequested] = useState(false);
+  const [agentContactEmail, setAgentContactEmail] = useState<string | null>(
+    null
+  );
   const [showShowingForm, setShowShowingForm] = useState(false);
   const [showingError, setShowingError] = useState("");
   const [showingLoading, setShowingLoading] = useState(false);
@@ -84,7 +87,9 @@ export default function ListingDetailActions({
       return;
     }
 
+    const result = await response.json();
     form.reset();
+    setAgentContactEmail(result.agentContactEmail ?? null);
     setShowingRequested(true);
     setShowShowingForm(false);
   }
@@ -107,6 +112,18 @@ export default function ListingDetailActions({
             The listing agent has received your inquiry and can follow up using
             the contact information you provided.
           </p>
+          {agentContactEmail && (
+            <p className="mt-3 text-sm">
+              Feel free to contact the agent at{" "}
+              <a
+                href={`mailto:${agentContactEmail}`}
+                className="font-semibold underline hover:text-emerald-700"
+              >
+                {agentContactEmail}
+              </a>
+              .
+            </p>
+          )}
           <Link
             href="/listings"
             className="mt-5 inline-flex bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg font-semibold transition"

@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { properties as mockProperties } from "@/data/properties";
 import {
-  supabaseRequest,
-  uploadSupabaseStorageObject,
+  anonymousSupabaseRequest,
+  authenticatedSupabaseRequest,
+  serviceRoleSupabaseRequest,
+  uploadServiceRoleStorageObject,
 } from "@/lib/supabase";
 import {
   approvalStatuses,
@@ -362,14 +364,19 @@ async function uploadListingImage(formData: FormData, listingId: string) {
   const extension = getFileExtension(file);
   const path = `${listingId}/primary-${randomUUID()}.${extension}`;
 
-  return uploadSupabaseStorageObject(listingImagesBucket, path, file);
+  return uploadServiceRoleStorageObject(listingImagesBucket, path, file);
 }
 
-async function assertListingOwner(id: string, ownerId: string) {
-  const rows = await supabaseRequest<ListingOwnerRow[]>(
+async function assertListingOwner(
+  id: string,
+  ownerId: string,
+  accessToken: string
+) {
+  const rows = await authenticatedSupabaseRequest<ListingOwnerRow[]>(
     `/listings?select=owner_id,approval_status&id=eq.${encodeURIComponent(
       id
-    )}&limit=1`
+    )}&limit=1`,
+    accessToken
   );
 
   if (!rows[0] || rows[0].owner_id !== ownerId) {
@@ -383,7 +390,7 @@ export async function getListings(): Promise<Property[]> {
   return readListingsWithFallback(
     "Load public listings",
     async () => {
-      const rows = await supabaseRequest<ListingRow[]>(
+      const rows = await anonymousSupabaseRequest<ListingRow[]>(
         "/listings?select=*&approval_status=eq.Approved&order=id.asc"
       );
 
@@ -395,14 +402,24 @@ export async function getListings(): Promise<Property[]> {
 
 export async function getListingsForViewer(
   role: "public" | "incomplete" | "agent" | "admin",
-  userId?: string
+  userId?: string,
+  accessToken?: string
 ): Promise<Property[]> {
-  if (role === "admin") {
+  if ((role === "agent" || role === "admin") && !accessToken) {
+    throw new Error("Supabase authenticated access token is required.");
+  }
+
+  if (role === "agent" && !userId) {
+    throw new Error("Authenticated agent user ID is required.");
+  }
+
+  if (role === "admin" && accessToken) {
     return readListingsWithFallback(
       "Load listings for admin viewer",
       async () => {
-        const rows = await supabaseRequest<ListingRow[]>(
-          "/listings?select=*&order=updated_at.desc"
+        const rows = await authenticatedSupabaseRequest<ListingRow[]>(
+          "/listings?select=*&order=updated_at.desc",
+          accessToken
         );
 
         return rows.map(toProperty);
@@ -411,12 +428,13 @@ export async function getListingsForViewer(
     );
   }
 
-  if (role === "agent" && userId) {
+  if (role === "agent" && userId && accessToken) {
     return readListingsWithFallback(
       "Load listings for agent viewer",
       async () => {
-        const rows = await supabaseRequest<ListingRow[]>(
-          "/listings?select=*&order=updated_at.desc"
+        const rows = await authenticatedSupabaseRequest<ListingRow[]>(
+          "/listings?select=*&order=updated_at.desc",
+          accessToken
         );
 
         return rows
@@ -433,13 +451,17 @@ export async function getListingsForViewer(
   return getListings();
 }
 
-export async function getListingById(id: string): Promise<Property | null> {
+export async function getListingById(
+  id: string,
+  accessToken?: string
+): Promise<Property | null> {
   return readListingsWithFallback(
     "Load listing detail",
     async () => {
-      const rows = await supabaseRequest<ListingRow[]>(
-        `/listings?select=*&id=eq.${encodeURIComponent(id)}&limit=1`
-      );
+      const path = `/listings?select=*&id=eq.${encodeURIComponent(id)}&limit=1`;
+      const rows = accessToken
+        ? await authenticatedSupabaseRequest<ListingRow[]>(path, accessToken)
+        : await anonymousSupabaseRequest<ListingRow[]>(path);
 
       return rows[0] ? toProperty(rows[0]) : null;
     },
@@ -447,12 +469,16 @@ export async function getListingById(id: string): Promise<Property | null> {
   );
 }
 
-export async function getListingsByOwner(ownerId: string): Promise<Property[]> {
+export async function getListingsByOwner(
+  ownerId: string,
+  accessToken: string
+): Promise<Property[]> {
   return readListingsWithFallback(
     "Load listings by owner",
     async () => {
-      const rows = await supabaseRequest<ListingRow[]>(
-        `/listings?select=*&owner_id=eq.${encodeURIComponent(ownerId)}&order=id.asc`
+      const rows = await authenticatedSupabaseRequest<ListingRow[]>(
+        `/listings?select=*&owner_id=eq.${encodeURIComponent(ownerId)}&order=id.asc`,
+        accessToken
       );
 
       return rows.map(toProperty);
@@ -468,6 +494,7 @@ export type AdminListingStatusFilter =
   | "Rejected";
 
 export async function getAdminListings(
+  accessToken: string,
   status: AdminListingStatusFilter = "Unapproved"
 ): Promise<Property[]> {
   const statusFilter =
@@ -477,8 +504,9 @@ export async function getAdminListings(
   return readListingsWithFallback(
     "Load admin review listings",
     async () => {
-      const rows = await supabaseRequest<ListingRow[]>(
-        `/listings?select=*${statusFilter}&order=updated_at.desc`
+      const rows = await authenticatedSupabaseRequest<ListingRow[]>(
+        `/listings?select=*${statusFilter}&order=updated_at.desc`,
+        accessToken
       );
 
       return rows.map(toProperty);
@@ -495,7 +523,8 @@ export async function getAdminListings(
 export async function createListing(
   formData: FormData,
   ownerId: string,
-  agentName: string
+  agentName: string,
+  accessToken: string
 ) {
   const id = randomUUID();
   const imageUrl = await uploadListingImage(formData, id);
@@ -509,13 +538,17 @@ export async function createListing(
     owner_id: ownerId,
   };
 
-  const rows = await supabaseRequest<ListingRow[]>("/listings", {
-    method: "POST",
-    headers: {
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify(body),
-  });
+  const rows = await authenticatedSupabaseRequest<ListingRow[]>(
+    "/listings",
+    accessToken,
+    {
+      method: "POST",
+      headers: {
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify(body),
+    }
+  );
 
   return toProperty(rows[0]);
 }
@@ -531,7 +564,7 @@ export async function updateListingApproval(
     throw new Error("Rejection reason is required.");
   }
 
-  const rows = await supabaseRequest<ListingRow[]>(
+  const rows = await serviceRoleSupabaseRequest<ListingRow[]>(
     `/listings?id=eq.${encodeURIComponent(id)}`,
     {
       method: "PATCH",
@@ -556,9 +589,14 @@ export async function updateListingApproval(
 export async function updateListingPhoto(
   id: string,
   formData: FormData,
-  ownerId: string
+  ownerId: string,
+  accessToken: string
 ) {
-  const existingListing = await assertListingOwner(id, ownerId);
+  const existingListing = await assertListingOwner(
+    id,
+    ownerId,
+    accessToken
+  );
 
   const imageUrl = await uploadListingImage(formData, id);
 
@@ -566,10 +604,11 @@ export async function updateListingPhoto(
     throw new Error("Please choose a photo to upload.");
   }
 
-  const rows = await supabaseRequest<ListingRow[]>(
+  const rows = await authenticatedSupabaseRequest<ListingRow[]>(
     `/listings?id=eq.${encodeURIComponent(id)}&owner_id=eq.${encodeURIComponent(
       ownerId
     )}`,
+    accessToken,
     {
       method: "PATCH",
       headers: {
@@ -598,14 +637,16 @@ export async function updateListingPhoto(
 export async function updateListing(
   id: string,
   formData: FormData,
-  ownerId: string
+  ownerId: string,
+  accessToken: string
 ) {
-  const existingRows = await supabaseRequest<
+  const existingRows = await authenticatedSupabaseRequest<
     Pick<ListingRow, "approval_status">[]
   >(
     `/listings?select=approval_status&id=eq.${encodeURIComponent(
       id
-    )}&owner_id=eq.${encodeURIComponent(ownerId)}&limit=1`
+    )}&owner_id=eq.${encodeURIComponent(ownerId)}&limit=1`,
+    accessToken
   );
 
   if (!existingRows[0]) {
@@ -623,10 +664,11 @@ export async function updateListing(
       : {}),
   };
 
-  const rows = await supabaseRequest<ListingRow[]>(
+  const rows = await authenticatedSupabaseRequest<ListingRow[]>(
     `/listings?id=eq.${encodeURIComponent(id)}&owner_id=eq.${encodeURIComponent(
       ownerId
     )}`,
+    accessToken,
     {
       method: "PATCH",
       headers: {
@@ -643,11 +685,16 @@ export async function updateListing(
   return toProperty(rows[0]);
 }
 
-export async function deleteListing(id: string, ownerId: string) {
-  const rows = await supabaseRequest<DeletedListingRow[]>(
+export async function deleteListing(
+  id: string,
+  ownerId: string,
+  accessToken: string
+) {
+  const rows = await authenticatedSupabaseRequest<DeletedListingRow[]>(
     `/listings?id=eq.${encodeURIComponent(id)}&owner_id=eq.${encodeURIComponent(
       ownerId
     )}`,
+    accessToken,
     {
       method: "DELETE",
       headers: {

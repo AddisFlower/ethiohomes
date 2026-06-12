@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       {
         method: "POST",
         headers: {
-          apikey: config.key,
+          apikey: config.anonKey,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ email, password }),

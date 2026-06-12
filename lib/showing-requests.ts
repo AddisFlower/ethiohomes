@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { getListingById } from "@/lib/listings";
 import { getShowingEligibility } from "@/lib/listing-rules";
-import { supabaseRequest } from "@/lib/supabase";
+import {
+  anonymousSupabaseRequest,
+  authenticatedSupabaseRequest,
+  serviceRoleSupabaseAuthRequest,
+} from "@/lib/supabase";
 
 export type ShowingRequest = {
   id: string;
@@ -42,6 +46,10 @@ export type ShowingRequestInput = {
   preferredDatetime?: string;
 };
 
+type SupabaseAdminUser = {
+  email?: string;
+};
+
 function toShowingRequest(row: ShowingRequestRow): ShowingRequest {
   return {
     id: row.id,
@@ -68,9 +76,20 @@ function assertEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+export async function getAgentContactEmail(agentOwnerId: string) {
+  // TODO: Replace the login email with a dedicated public contact field.
+  const user = await serviceRoleSupabaseAuthRequest<SupabaseAdminUser>(
+    `/admin/users/${encodeURIComponent(agentOwnerId)}`
+  );
+  const email = user.email?.trim();
+
+  return email && assertEmail(email) ? email : null;
+}
+
 export async function createShowingRequest(
   input: ShowingRequestInput,
-  requesterUserId?: string
+  requesterUserId?: string,
+  accessToken?: string
 ) {
   const listingId = input.listingId?.trim();
   const requesterName = input.name?.trim();
@@ -88,7 +107,7 @@ export async function createShowingRequest(
     throw new Error("A valid email is required.");
   }
 
-  const listing = await getListingById(listingId);
+  const listing = await getListingById(listingId, accessToken);
 
   if (!listing) {
     throw new Error("Listing not found.");
@@ -106,7 +125,7 @@ export async function createShowingRequest(
     );
   }
 
-  const rows = await supabaseRequest<ShowingRequestRow[]>("/showing_requests", {
+  const requestInit: RequestInit = {
     method: "POST",
     headers: {
       Prefer: "return=representation",
@@ -124,16 +143,30 @@ export async function createShowingRequest(
       message: cleanOptional(input.message),
       status: "New",
     }),
-  });
+  };
+  const rows = accessToken
+    ? await authenticatedSupabaseRequest<ShowingRequestRow[]>(
+        "/showing_requests",
+        accessToken,
+        requestInit
+      )
+    : await anonymousSupabaseRequest<ShowingRequestRow[]>(
+        "/showing_requests",
+        requestInit
+      );
 
   return toShowingRequest(rows[0]);
 }
 
-export async function getShowingRequests(ownerId: string) {
-  const rows = await supabaseRequest<ShowingRequestRow[]>(
+export async function getShowingRequests(
+  ownerId: string,
+  accessToken: string
+) {
+  const rows = await authenticatedSupabaseRequest<ShowingRequestRow[]>(
     `/showing_requests?select=*&agent_owner_id=eq.${encodeURIComponent(
       ownerId
-    )}&order=created_at.desc`
+    )}&order=created_at.desc`,
+    accessToken
   );
 
   return rows.map(toShowingRequest);

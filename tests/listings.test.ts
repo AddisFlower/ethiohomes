@@ -9,20 +9,27 @@ import {
 import { authUser, otherAuthUser } from "@/tests/fixtures/auth";
 
 const mocks = vi.hoisted(() => ({
-  supabaseRequest: vi.fn(),
+  anonymousSupabaseRequest: vi.fn(),
+  authenticatedSupabaseRequest: vi.fn(),
+  serviceRoleSupabaseRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", () => ({
-  supabaseRequest: mocks.supabaseRequest,
-  uploadSupabaseStorageObject: vi.fn(),
+  anonymousSupabaseRequest: mocks.anonymousSupabaseRequest,
+  authenticatedSupabaseRequest: mocks.authenticatedSupabaseRequest,
+  serviceRoleSupabaseRequest: mocks.serviceRoleSupabaseRequest,
+  uploadServiceRoleStorageObject: vi.fn(),
 }));
 
 import {
   deleteListing,
   getListings,
+  getListingsByOwner,
+  getListingsForViewer,
   isListingReadError,
   listingNotFoundOrDeniedMessage,
   listingsUnavailableMessage,
+  updateListingApproval,
 } from "@/lib/listings";
 
 const approvedListingRow = {
@@ -60,7 +67,7 @@ describe("listing read fallback policy", () => {
 
   it("returns successful Supabase reads without using mock listings", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    mocks.supabaseRequest.mockResolvedValue([approvedListingRow]);
+    mocks.anonymousSupabaseRequest.mockResolvedValue([approvedListingRow]);
 
     const listings = await getListings();
 
@@ -77,7 +84,7 @@ describe("listing read fallback policy", () => {
 
   it("uses mock listings after a read failure in development", async () => {
     vi.stubEnv("NODE_ENV", "development");
-    mocks.supabaseRequest.mockRejectedValue(
+    mocks.anonymousSupabaseRequest.mockRejectedValue(
       new Error("Supabase is unavailable.")
     );
 
@@ -93,7 +100,7 @@ describe("listing read fallback policy", () => {
   it("allows explicit demo fallback in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("ETHIOMLS_ENABLE_MOCK_LISTINGS", "true");
-    mocks.supabaseRequest.mockRejectedValue(
+    mocks.anonymousSupabaseRequest.mockRejectedValue(
       new Error("Supabase is unavailable.")
     );
 
@@ -105,7 +112,7 @@ describe("listing read fallback policy", () => {
   it("fails closed instead of returning mock listings in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("ETHIOMLS_ENABLE_MOCK_LISTINGS", "false");
-    mocks.supabaseRequest.mockRejectedValue(
+    mocks.anonymousSupabaseRequest.mockRejectedValue(
       new Error("Supabase is unavailable.")
     );
 
@@ -122,7 +129,7 @@ describe("listing read fallback policy", () => {
 
   it("treats missing Supabase configuration as a production read failure", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    mocks.supabaseRequest.mockRejectedValue(
+    mocks.anonymousSupabaseRequest.mockRejectedValue(
       new Error("Supabase environment variables are not configured.")
     );
 
@@ -146,14 +153,15 @@ describe("deleteListing", () => {
       id: "listing/with spaces",
       owner_id: authUser.id,
     };
-    mocks.supabaseRequest.mockResolvedValue([deletedRow]);
+    mocks.authenticatedSupabaseRequest.mockResolvedValue([deletedRow]);
 
     await expect(
-      deleteListing(deletedRow.id, authUser.id)
+      deleteListing(deletedRow.id, authUser.id, "user-access-token")
     ).resolves.toEqual(deletedRow);
 
-    expect(mocks.supabaseRequest).toHaveBeenCalledWith(
+    expect(mocks.authenticatedSupabaseRequest).toHaveBeenCalledWith(
       `/listings?id=eq.listing%2Fwith%20spaces&owner_id=eq.${authUser.id}`,
+      "user-access-token",
       {
         method: "DELETE",
         headers: {
@@ -164,28 +172,75 @@ describe("deleteListing", () => {
   });
 
   it("rejects a non-owner delete when the owner filter returns no row", async () => {
-    mocks.supabaseRequest.mockResolvedValue([]);
+    mocks.authenticatedSupabaseRequest.mockResolvedValue([]);
 
     await expect(
-      deleteListing("listing-1", otherAuthUser.id)
+      deleteListing("listing-1", otherAuthUser.id, "user-access-token")
     ).rejects.toThrow(listingNotFoundOrDeniedMessage);
   });
 
   it("rejects a missing listing when the delete returns no row", async () => {
-    mocks.supabaseRequest.mockResolvedValue([]);
+    mocks.authenticatedSupabaseRequest.mockResolvedValue([]);
 
     await expect(
-      deleteListing("missing-listing", authUser.id)
+      deleteListing("missing-listing", authUser.id, "user-access-token")
     ).rejects.toThrow(listingNotFoundOrDeniedMessage);
   });
 
   it("preserves Supabase failures instead of reporting a successful delete", async () => {
-    mocks.supabaseRequest.mockRejectedValue(
+    mocks.authenticatedSupabaseRequest.mockRejectedValue(
       new Error("Supabase delete failed.")
     );
 
     await expect(
-      deleteListing("listing-1", authUser.id)
+      deleteListing("listing-1", authUser.id, "user-access-token")
     ).rejects.toThrow("Supabase delete failed.");
+  });
+});
+
+describe("listing credential routing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("uses the authenticated path for owner listing reads", async () => {
+    mocks.authenticatedSupabaseRequest.mockResolvedValue([
+      approvedListingRow,
+    ]);
+
+    await getListingsByOwner(authUser.id, "user-access-token");
+
+    expect(mocks.authenticatedSupabaseRequest).toHaveBeenCalledWith(
+      `/listings?select=*&owner_id=eq.${authUser.id}&order=id.asc`,
+      "user-access-token"
+    );
+    expect(mocks.anonymousSupabaseRequest).not.toHaveBeenCalled();
+    expect(mocks.serviceRoleSupabaseRequest).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when an agent listing read has no user token", async () => {
+    await expect(
+      getListingsForViewer("agent", authUser.id)
+    ).rejects.toThrow("Supabase authenticated access token is required.");
+    expect(mocks.anonymousSupabaseRequest).not.toHaveBeenCalled();
+    expect(mocks.authenticatedSupabaseRequest).not.toHaveBeenCalled();
+    expect(mocks.serviceRoleSupabaseRequest).not.toHaveBeenCalled();
+  });
+
+  it("uses the service path for admin approval updates", async () => {
+    mocks.serviceRoleSupabaseRequest.mockResolvedValue([
+      approvedListingRow,
+    ]);
+
+    await updateListingApproval("listing-1", "Approved");
+
+    expect(mocks.serviceRoleSupabaseRequest).toHaveBeenCalledWith(
+      "/listings?id=eq.listing-1",
+      expect.objectContaining({
+        method: "PATCH",
+      })
+    );
+    expect(mocks.anonymousSupabaseRequest).not.toHaveBeenCalled();
+    expect(mocks.authenticatedSupabaseRequest).not.toHaveBeenCalled();
   });
 });

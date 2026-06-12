@@ -22,7 +22,10 @@ export default async function MyListingsPage() {
   let myListings;
 
   try {
-    myListings = await getListingsByOwner(session.user.id);
+    myListings = await getListingsByOwner(
+      session.user.id,
+      session.accessToken
+    );
   } catch (error) {
     if (isListingReadError(error)) {
       return (

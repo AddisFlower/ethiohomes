@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   agentSession,
   incompleteSession,
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createListing: vi.fn(),
   createShowingRequest: vi.fn(),
   deleteListing: vi.fn(),
+  getAgentContactEmail: vi.fn(),
   getAppSession: vi.fn(),
   updateListing: vi.fn(),
   updateListingApproval: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock("@/lib/listings", () => ({
 
 vi.mock("@/lib/showing-requests", () => ({
   createShowingRequest: mocks.createShowingRequest,
+  getAgentContactEmail: mocks.getAgentContactEmail,
 }));
 
 import { PATCH as updateApproval } from "@/app/api/admin/listings/[id]/approval/route";
@@ -51,6 +53,10 @@ import { POST as createShowingRequest } from "@/app/api/showing-requests/route";
 const routeContext = {
   params: Promise.resolve({ id: "listing-1" }),
 };
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("protected listing route authorization", () => {
   beforeEach(() => {
@@ -147,7 +153,8 @@ describe("listing DELETE route", () => {
     await expect(response.json()).resolves.toEqual({ ok: true });
     expect(mocks.deleteListing).toHaveBeenCalledWith(
       "listing-1",
-      agentSession.user.id
+      agentSession.user.id,
+      agentSession.accessToken
     );
   });
 
@@ -192,9 +199,17 @@ describe("listing DELETE route", () => {
 });
 
 describe("showing request identity handling", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getAgentContactEmail.mockResolvedValue("agent@example.com");
+  });
+
   it("passes an incomplete authenticated user's ID to the owner check", async () => {
     mocks.getAppSession.mockResolvedValue(incompleteSession);
-    mocks.createShowingRequest.mockResolvedValue({ id: "request-1" });
+    mocks.createShowingRequest.mockResolvedValue({
+      id: "request-1",
+      agentOwnerId: agentSession.user.id,
+    });
 
     const response = await createShowingRequest(
       new Request("http://localhost/api/showing-requests", {
@@ -211,7 +226,52 @@ describe("showing request identity handling", () => {
     expect(response.status).toBe(200);
     expect(mocks.createShowingRequest).toHaveBeenCalledWith(
       expect.objectContaining({ listingId: "listing-1" }),
-      incompleteSession.user.id
+      incompleteSession.user.id,
+      incompleteSession.accessToken
+    );
+    await expect(response.json()).resolves.toEqual({
+      showingRequest: {
+        id: "request-1",
+        agentOwnerId: agentSession.user.id,
+      },
+      agentContactEmail: "agent@example.com",
+    });
+  });
+
+  it("keeps the showing request successful when contact lookup fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.getAppSession.mockResolvedValue(publicSession);
+    mocks.createShowingRequest.mockResolvedValue({
+      id: "request-1",
+      agentOwnerId: agentSession.user.id,
+    });
+    mocks.getAgentContactEmail.mockRejectedValue(
+      new Error("Supabase Auth unavailable.")
+    );
+
+    const response = await createShowingRequest(
+      new Request("http://localhost/api/showing-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          listingId: "listing-1",
+          name: "Test User",
+          email: "test@example.com",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      showingRequest: {
+        id: "request-1",
+        agentOwnerId: agentSession.user.id,
+      },
+      agentContactEmail: null,
+    });
+    expect(console.error).toHaveBeenCalledWith(
+      "[EthioMLS] Agent contact email lookup failed.",
+      expect.any(Error)
     );
   });
 });
