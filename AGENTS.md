@@ -113,8 +113,8 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
   owner-scoped showing-request reads use the signed-in user's access token.
 - Admin approval and signup profile creation use the explicit service-role
   path.
-- RLS activation is prepared but must be applied and manually verified in a
-  dedicated Supabase test/staging environment before production.
+- RLS is enabled in the current Supabase test-data environment and the core
+  public, agent, ownership, showing-request, and admin smoke tests pass.
 - Login does not create missing profiles or infer an agent role.
 - Agent signup remains responsible for creating the initial agent profile.
 - Admins inherit normal agent capabilities and also access `/admin`.
@@ -445,25 +445,27 @@ Current status:
 
 Top remaining recommendations by priority:
 1. Finish remaining UX bugs found in manual testing.
-2. Prepare user-scoped Supabase helpers and RLS policy tests.
-3. Implement RLS only after authenticated request paths and integration-test prerequisites are ready.
+2. Complete the remaining direct REST RLS abuse tests before real production
+   data or users are introduced.
+3. Decide whether authenticated Storage policies should replace the current
+   explicit service-role image upload path.
 4. Introduce client accounts.
-5. Add favorites, inquiry history, showing-request statuses, and multi-photo galleries.
+5. Add favorites, inquiry history, showing-request statuses, and multi-photo
+   galleries.
 
 Recommended next implementation slice:
-- Apply the prepared RLS migration to a dedicated test/staging Supabase
-  environment and complete `docs/rls-rollout-testing.md`.
-- Verify public, owner, non-owner, incomplete, agent, and admin boundaries
-  against actual Postgres RLS behavior.
+- Complete the direct REST abuse tests in `docs/rls-rollout-testing.md`.
+- Retain `supabase/rls-rollback.sql` as emergency recovery while the current
+  environment contains only disposable test data.
 - Add authenticated Storage upload policies and tests before moving image
   uploads away from the explicit service-role Storage helper.
-- Apply the same migration to production only after staging and direct REST
-  abuse tests pass.
+- Before real production use, repeat the full RLS checklist in a staging
+  environment and confirm backups and rollback procedures.
 
 ## Known Limitations and Technical Debt
-- Create/update/delete now send the authenticated user's access token, but RLS
-  is not enabled yet, so application route checks remain the active boundary.
-- Auth is enforced in app route handlers and server pages; RLS is still disabled for this phase.
+- Create/update/delete send the authenticated user's access token and are
+  enforced by both application authorization and database RLS.
+- Application route checks remain required even though RLS is enabled.
 - Mock reads remain available in development and explicit demo mode. Production
   fails closed unless `ETHIOMLS_ENABLE_MOCK_LISTINGS=true` is deliberately set.
 - Delete is currently a hard delete.
@@ -474,8 +476,8 @@ Recommended next implementation slice:
 - Photo management supports one primary image only; galleries and ordering are future work.
 - Save Listing is hidden. Restore it only with client accounts and persistent favorites; do not add a browser-local success state.
 - Showing request status is currently always `New`; this is acceptable for MVP/internal demos, but a follow-up workflow will be valuable after client accounts.
-- Admin access uses `public.profiles.role`; RLS SQL is prepared but has not yet
-  been applied to the connected Supabase environment.
+- Admin access uses `public.profiles.role` in both application authorization
+  and RLS role helpers.
 - `verified` remains a supporting database flag and should not be treated as the primary UI state.
 - Initial Vitest authorization and visibility tests exist. Broader database and
   browser-level workflow coverage is still required.
@@ -504,8 +506,9 @@ Reason for postponing:
 
 ## Recommended Next Sequence
 1. Finish remaining UX bugs found in manual testing.
-2. Apply and verify the prepared RLS migration in staging.
-3. Enable RLS in production only after staging and REST abuse tests pass.
+2. Complete the remaining direct REST RLS abuse tests.
+3. Repeat the full RLS rollout in staging before introducing real production
+   data or users.
 4. Introduce client accounts.
 5. Add favorites, inquiry history, showing-request statuses, and multi-photo galleries.
 
@@ -682,8 +685,15 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
   - Owner updates cannot alter admin-controlled approval fields; edits to
     rejected listings still resubmit them as Unapproved.
   - Anonymous showing-request inserts do not receive lead rows back.
-- RLS has not been applied to the connected Supabase project from this
-  workspace. Apply it to staging first and complete the rollout checklist.
+- `supabase/rls-policies.sql` was applied to the connected Supabase environment,
+  which currently contains disposable test data.
+- Quick RLS smoke tests passed for public visibility and showing requests,
+  agent ownership and lead isolation, non-owner denial, and admin review.
+- Rejected and Unapproved listings are hidden from unrelated agents regardless
+  of market status. Only Approved + Off Market listings receive the
+  other-agent visibility exception.
+- Listing collections use `created_at desc`, so newly uploaded listings appear
+  first and editing an older listing does not move it above newer listings.
 - Supabase credential paths are separated and verified:
   - Anonymous REST requests use the anon key as both `apikey` and bearer token.
   - Authenticated REST requests use the anon key as `apikey` and the signed-in
@@ -697,8 +707,7 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
   intended credential paths.
 - Credential and operation-routing tests pass, and missing credentials fail
   closed.
-- RLS remains disabled in the connected environment until the prepared
-  migration is applied and verified through the staged rollout checklist.
+- RLS is enabled in the connected test-data environment.
 - UUID ownership migration was applied and manually verified in Supabase.
 - `listings.owner_id` and `showing_requests.agent_owner_id` now report the
   PostgreSQL `uuid` data type.
@@ -710,8 +719,8 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Post-migration manual tests passed for listing CRUD, photo management,
   showing-request submission, owner-scoped request visibility, cascade cleanup,
   and non-owner authorization.
-- Recommended next engineering task: apply the prepared RLS migration in a
-  dedicated staging environment and complete the rollout checklist.
+- Recommended next engineering task: complete the direct REST abuse tests in
+  `docs/rls-rollout-testing.md`, then continue resolving remaining UX issues.
 - UUID ownership migration is prepared:
   - `supabase/ownership-uuid-migration.sql` removes `agent-1`/`agent-2` demo
     records, validates all remaining ownership values, converts ownership
@@ -737,12 +746,13 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Listing read tests cover successful Supabase reads, development fallback,
   explicit production demo fallback, production failure, and missing
   configuration.
-- The full Vitest suite passes with 65 tests.
+- The full Vitest suite passes with 67 tests.
 - `npm run build` passes.
 - The UUID ownership migration and Supabase credential-path separation are
   complete; do not rerun migration scripts against a verified environment
   without first confirming the current schema and backup state.
-- Latest checkpoint commit: `1a9e85d Verify owner-filtered listing deletes`.
+- Latest checkpoint commit:
+  `288cb0d Harden RLS visibility and sort listings newest first`.
 - Owner-filtered Supabase deletes now use `Prefer: return=representation` and
   require one returned row before reporting success.
 - Delete helper and route tests cover owned, non-owned, missing, and Supabase
