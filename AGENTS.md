@@ -87,6 +87,12 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
   explicit demo mode.
 - Production listing-read failures log server-side context and render a clear
   listings-unavailable state instead of silently showing demo data.
+- RLS policy, rollback, and staged rollout files are prepared:
+  - `supabase/rls-policies.sql`
+  - `supabase/rls-rollback.sql`
+  - `docs/rls-rollout-testing.md`
+- Public showing-request inserts use `Prefer: return=minimal` so anonymous
+  users do not need read access to private lead rows.
 
 ## Supabase Integration Status
 - Supabase/Postgres is the active persistence layer for listings.
@@ -106,6 +112,8 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
   owner-scoped showing-request reads use the signed-in user's access token.
 - Admin approval and signup profile creation use the explicit service-role
   path.
+- RLS activation is prepared but must be applied and manually verified in a
+  dedicated Supabase test/staging environment before production.
 - Login does not create missing profiles or infer an agent role.
 - Agent signup remains responsible for creating the initial agent profile.
 - Admins inherit normal agent capabilities and also access `/admin`.
@@ -439,14 +447,14 @@ Top remaining recommendations by priority:
 5. Add favorites, inquiry history, showing-request statuses, and multi-photo galleries.
 
 Recommended next implementation slice:
-- Design a dedicated RLS integration-test strategy and stable database
-  fixtures for public, owner, non-owner, incomplete, agent, and admin users.
-- Draft policies for public listing visibility, owner listing management,
-  owner-only showing-request access, and admin listing review.
+- Apply the prepared RLS migration to a dedicated test/staging Supabase
+  environment and complete `docs/rls-rollout-testing.md`.
+- Verify public, owner, non-owner, incomplete, agent, and admin boundaries
+  against actual Postgres RLS behavior.
 - Add authenticated Storage upload policies and tests before moving image
   uploads away from the explicit service-role Storage helper.
-- Do not enable RLS until the policy tests and environment rollback procedure
-  are ready.
+- Apply the same migration to production only after staging and direct REST
+  abuse tests pass.
 
 ## Known Limitations and Technical Debt
 - Create/update/delete now send the authenticated user's access token, but RLS
@@ -462,7 +470,8 @@ Recommended next implementation slice:
 - Photo management supports one primary image only; galleries and ordering are future work.
 - Save Listing is hidden. Restore it only with client accounts and persistent favorites; do not add a browser-local success state.
 - Showing request status is currently always `New`; this is acceptable for MVP/internal demos, but a follow-up workflow will be valuable after client accounts.
-- Admin access uses `public.profiles.role`; database RLS is still pending.
+- Admin access uses `public.profiles.role`; RLS SQL is prepared but has not yet
+  been applied to the connected Supabase environment.
 - `verified` remains a supporting database flag and should not be treated as the primary UI state.
 - Initial Vitest authorization and visibility tests exist. Broader database and
   browser-level workflow coverage is still required.
@@ -491,8 +500,8 @@ Reason for postponing:
 
 ## Recommended Next Sequence
 1. Finish remaining UX bugs found in manual testing.
-2. Design RLS integration fixtures, policies, and rollback verification.
-3. Add RLS integration tests, then enable RLS.
+2. Apply and verify the prepared RLS migration in staging.
+3. Enable RLS in production only after staging and REST abuse tests pass.
 4. Introduce client accounts.
 5. Add favorites, inquiry history, showing-request statuses, and multi-photo galleries.
 
@@ -659,6 +668,18 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Keep MVP changes narrow and verify with `npm run lint`.
 
 ## Next Session Context
+- RLS implementation is prepared locally:
+  - `supabase/rls-policies.sql` enables policies for profiles, listings, and
+    showing requests.
+  - `supabase/rls-rollback.sql` provides emergency rollback.
+  - `docs/rls-rollout-testing.md` defines staged application and direct REST
+    verification.
+  - Role helper functions live in a non-exposed `ethiomls_private` schema.
+  - Owner updates cannot alter admin-controlled approval fields; edits to
+    rejected listings still resubmit them as Unapproved.
+  - Anonymous showing-request inserts do not receive lead rows back.
+- RLS has not been applied to the connected Supabase project from this
+  workspace. Apply it to staging first and complete the rollout checklist.
 - Supabase credential paths are separated and verified:
   - Anonymous REST requests use the anon key as both `apikey` and bearer token.
   - Authenticated REST requests use the anon key as `apikey` and the signed-in
@@ -672,8 +693,8 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
   intended credential paths.
 - Credential and operation-routing tests pass, and missing credentials fail
   closed.
-- RLS remains disabled. The next task is to design RLS integration fixtures,
-  policies, and rollback verification before enabling it.
+- RLS remains disabled in the connected environment until the prepared
+  migration is applied and verified through the staged rollout checklist.
 - UUID ownership migration was applied and manually verified in Supabase.
 - `listings.owner_id` and `showing_requests.agent_owner_id` now report the
   PostgreSQL `uuid` data type.
@@ -685,8 +706,8 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Post-migration manual tests passed for listing CRUD, photo management,
   showing-request submission, owner-scoped request visibility, cascade cleanup,
   and non-owner authorization.
-- Recommended next engineering task: design RLS integration fixtures,
-  policies, and rollback verification before enabling RLS.
+- Recommended next engineering task: apply the prepared RLS migration in a
+  dedicated staging environment and complete the rollout checklist.
 - UUID ownership migration is prepared:
   - `supabase/ownership-uuid-migration.sql` removes `agent-1`/`agent-2` demo
     records, validates all remaining ownership values, converts ownership
@@ -712,7 +733,7 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Listing read tests cover successful Supabase reads, development fallback,
   explicit production demo fallback, production failure, and missing
   configuration.
-- The full Vitest suite passes with 51 tests.
+- The full Vitest suite passes with 65 tests.
 - `npm run build` passes.
 - The UUID ownership migration and Supabase credential-path separation are
   complete; do not rerun migration scripts against a verified environment

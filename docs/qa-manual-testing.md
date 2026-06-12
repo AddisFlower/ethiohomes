@@ -3,6 +3,10 @@
 Run `supabase/qa-product-rules-migration.sql` in the Supabase SQL Editor before
 testing the updated application.
 
+For RLS activation and role-boundary testing, follow
+`docs/rls-rollout-testing.md` in a dedicated test/staging Supabase environment
+before applying `supabase/rls-policies.sql` to production.
+
 ## Schema And Backfill
 
 1. Before migration, record the total listing count and several existing IDs.

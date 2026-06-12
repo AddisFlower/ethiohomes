@@ -82,7 +82,13 @@ async function restRequest<T>(
     return undefined as T;
   }
 
-  return response.json() as Promise<T>;
+  const body = await response.text();
+
+  if (!body) {
+    return undefined as T;
+  }
+
+  return JSON.parse(body) as T;
 }
 
 export function anonymousSupabaseRequest<T>(

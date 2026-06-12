@@ -125,37 +125,53 @@ export async function createShowingRequest(
     );
   }
 
+  const id = randomUUID();
+  const requesterPhone = cleanOptional(input.phone);
+  const preferredDatetime = cleanOptional(input.preferredDatetime);
+  const message = cleanOptional(input.message);
   const requestInit: RequestInit = {
     method: "POST",
     headers: {
-      Prefer: "return=representation",
+      Prefer: "return=minimal",
     },
     body: JSON.stringify({
-      id: randomUUID(),
+      id,
       listing_id: listing.id,
       listing_title: listing.title,
       listing_mls_id: listing.listingId,
       agent_owner_id: listing.ownerId,
       requester_name: requesterName,
       requester_email: requesterEmail,
-      requester_phone: cleanOptional(input.phone),
-      preferred_datetime: cleanOptional(input.preferredDatetime),
-      message: cleanOptional(input.message),
+      requester_phone: requesterPhone,
+      preferred_datetime: preferredDatetime,
+      message,
       status: "New",
     }),
   };
-  const rows = accessToken
-    ? await authenticatedSupabaseRequest<ShowingRequestRow[]>(
-        "/showing_requests",
-        accessToken,
-        requestInit
-      )
-    : await anonymousSupabaseRequest<ShowingRequestRow[]>(
-        "/showing_requests",
-        requestInit
-      );
+  if (accessToken) {
+    await authenticatedSupabaseRequest<void>(
+      "/showing_requests",
+      accessToken,
+      requestInit
+    );
+  } else {
+    await anonymousSupabaseRequest<void>("/showing_requests", requestInit);
+  }
 
-  return toShowingRequest(rows[0]);
+  return {
+    id,
+    listingId: listing.id,
+    listingTitle: listing.title,
+    listingMlsId: listing.listingId,
+    agentOwnerId: listing.ownerId,
+    requesterName,
+    requesterEmail,
+    requesterPhone,
+    preferredDatetime,
+    message,
+    status: "New",
+    createdAt: new Date().toISOString(),
+  } satisfies ShowingRequest;
 }
 
 export async function getShowingRequests(

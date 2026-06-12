@@ -45,6 +45,19 @@ describe("Supabase credential paths", () => {
     );
   });
 
+  it("accepts successful return-minimal responses with no body", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(null, { status: 201 })
+    );
+
+    await expect(
+      anonymousSupabaseRequest("/showing_requests", {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+      })
+    ).resolves.toBeUndefined();
+  });
+
   it("uses the anonymous API key and user JWT for authenticated requests", async () => {
     await authenticatedSupabaseRequest(
       "/listings?id=eq.listing-1",

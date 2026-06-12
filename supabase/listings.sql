@@ -213,3 +213,7 @@ select setval(
   ),
   true
 );
+
+-- New environments should finish setup by running supabase/rls-policies.sql.
+-- Keeping policy activation in a separate script makes the security boundary
+-- explicit and preserves a tested emergency rollback path.
