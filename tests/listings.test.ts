@@ -12,13 +12,14 @@ const mocks = vi.hoisted(() => ({
   anonymousSupabaseRequest: vi.fn(),
   authenticatedSupabaseRequest: vi.fn(),
   serviceRoleSupabaseRequest: vi.fn(),
+  uploadAuthenticatedStorageObject: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", () => ({
   anonymousSupabaseRequest: mocks.anonymousSupabaseRequest,
   authenticatedSupabaseRequest: mocks.authenticatedSupabaseRequest,
   serviceRoleSupabaseRequest: mocks.serviceRoleSupabaseRequest,
-  uploadServiceRoleStorageObject: vi.fn(),
+  uploadAuthenticatedStorageObject: mocks.uploadAuthenticatedStorageObject,
 }));
 
 import {
@@ -29,6 +30,7 @@ import {
   isListingReadError,
   listingNotFoundOrDeniedMessage,
   listingsUnavailableMessage,
+  createListing,
   updateListingApproval,
 } from "@/lib/listings";
 
@@ -252,5 +254,47 @@ describe("listing credential routing", () => {
     );
     expect(mocks.anonymousSupabaseRequest).not.toHaveBeenCalled();
     expect(mocks.authenticatedSupabaseRequest).not.toHaveBeenCalled();
+  });
+
+  it("uploads new listing images with the authenticated storage path", async () => {
+    const formData = new FormData();
+    const file = new File(["photo"], "listing.jpg", { type: "image/jpeg" });
+    formData.set("title", "New Listing");
+    formData.set("price", "1000");
+    formData.set("city", "Addis Ababa");
+    formData.set("address", "Test address");
+    formData.set("propertyType", "Apartment");
+    formData.set("transactionType", "For Sale");
+    formData.set("marketStatus", "Active");
+    formData.set("bedrooms", "1");
+    formData.set("bathrooms", "1");
+    formData.set("description", "Test description");
+    formData.set("imageFile", file);
+    mocks.uploadAuthenticatedStorageObject.mockResolvedValue(
+      "https://project.supabase.co/storage/v1/object/public/listing-images/uploaded.jpg"
+    );
+    mocks.authenticatedSupabaseRequest.mockResolvedValue([
+      {
+        ...approvedListingRow,
+        image:
+          "https://project.supabase.co/storage/v1/object/public/listing-images/uploaded.jpg",
+      },
+    ]);
+
+    await createListing(
+      formData,
+      authUser.id,
+      "Agent Example",
+      "user-access-token"
+    );
+
+    expect(mocks.uploadAuthenticatedStorageObject).toHaveBeenCalledWith(
+      "listing-images",
+      expect.stringMatching(
+        new RegExp(`^${authUser.id}/[0-9a-f-]+/primary-[0-9a-f-]+\\.jpg$`)
+      ),
+      file,
+      "user-access-token"
+    );
   });
 });

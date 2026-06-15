@@ -7,12 +7,14 @@ import {
 
 const mocks = vi.hoisted(() => ({
   createListing: vi.fn(),
+  createAgentClient: vi.fn(),
   createShowingRequest: vi.fn(),
   deleteListing: vi.fn(),
   getAgentContactEmail: vi.fn(),
   getAppSession: vi.fn(),
   updateListing: vi.fn(),
   updateListingApproval: vi.fn(),
+  updateAgentClient: vi.fn(),
   updateListingPhoto: vi.fn(),
 }));
 
@@ -41,7 +43,14 @@ vi.mock("@/lib/showing-requests", () => ({
   getAgentContactEmail: mocks.getAgentContactEmail,
 }));
 
+vi.mock("@/lib/clients", () => ({
+  createAgentClient: mocks.createAgentClient,
+  updateAgentClient: mocks.updateAgentClient,
+}));
+
 import { PATCH as updateApproval } from "@/app/api/admin/listings/[id]/approval/route";
+import { POST as createAgentClient } from "@/app/api/clients/route";
+import { PUT as updateAgentClient } from "@/app/api/clients/[id]/route";
 import { POST as createListing } from "@/app/api/listings/route";
 import {
   DELETE as deleteListing,
@@ -52,6 +61,9 @@ import { POST as createShowingRequest } from "@/app/api/showing-requests/route";
 
 const routeContext = {
   params: Promise.resolve({ id: "listing-1" }),
+};
+const clientRouteContext = {
+  params: Promise.resolve({ id: "client-1" }),
 };
 
 afterEach(() => {
@@ -79,6 +91,15 @@ describe("protected listing route authorization", () => {
 
   it.each([
     ["create", () => createListing(new Request("http://localhost/api/listings"))],
+    ["create client", () => createAgentClient(new Request("http://localhost/api/clients"))],
+    [
+      "update client",
+      () =>
+        updateAgentClient(
+          new Request("http://localhost/api/clients/client-1"),
+          clientRouteContext
+        ),
+    ],
     [
       "update",
       () =>

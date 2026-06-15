@@ -103,6 +103,19 @@ export default async function ShowingRequestsPage() {
                   >
                     View Listing
                   </Link>
+
+                  <Link
+                    href={`/clients/new?${new URLSearchParams({
+                      name: request.requesterName,
+                      email: request.requesterEmail,
+                      phone: request.requesterPhone ?? "",
+                      source: "Showing Request",
+                      notes: `Interested in ${request.listingTitle} (${request.listingMlsId}).${request.message ? ` Message: ${request.message}` : ""}`,
+                    }).toString()}`}
+                    className="inline-flex text-emerald-700 font-semibold hover:text-emerald-800"
+                  >
+                    Add to Clients
+                  </Link>
                 </div>
 
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">

@@ -141,3 +141,34 @@ Use a non-owner visitor or agent for each test.
 6. Confirm Browse filters initialize from URL parameters.
 7. Combine search, category, transaction, market status, and property type filters.
 8. Click Clear Filters and confirm the viewer-appropriate listing set returns.
+
+## Agent Clients Outreach
+
+1. Sign in as an agent.
+2. Confirm the navbar shows a Clients dropdown with Client Leads, Client List,
+   Add Client, Follow-ups, and Automated Alerts.
+3. Open `/clients/new` and create a client with name, email, phone, source,
+   status, notes, follow-up date, saved criteria, and alerts enabled.
+4. Expected: saving redirects to the client detail page.
+5. Open `/clients`.
+6. Expected: the new client appears with status, source, alert state, and
+   follow-up summary.
+7. Open the client detail page.
+8. Expected: contact details, notes, saved criteria, alert status, and matching
+   listings render.
+9. Edit the client and change status, notes, follow-up date, criteria, and
+   alert frequency.
+10. Expected: changes persist after refresh.
+11. Open `/clients/follow-ups`.
+12. Expected: clients with due follow-up dates appear.
+13. Open `/clients/alerts`.
+14. Expected: alert-enabled clients appear with match counts and a clear note
+    that email sending is not enabled yet.
+15. From `/showing-requests`, click Add to Clients on a request.
+16. Expected: `/clients/new` opens with name, email, phone, source, and notes
+    prefilled from the showing request.
+17. Sign in as a different agent.
+18. Expected: the first agent's clients do not appear.
+19. Sign in as an admin who does not own those client records.
+20. Expected: admin access does not grant global access to other agents'
+    clients.

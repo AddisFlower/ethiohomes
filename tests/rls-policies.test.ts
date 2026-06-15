@@ -114,6 +114,45 @@ describe("RLS policy migration contract", () => {
     );
   });
 
+  it("keeps agent client records owner-only, including for admins", () => {
+    expect(policies).toMatch(
+      /policy agent_clients_select_owned[\s\S]*for select[\s\S]*to authenticated[\s\S]*owner_id = auth\.uid\(\)/i
+    );
+    expect(policies).toMatch(
+      /policy agent_clients_insert_owned[\s\S]*for insert[\s\S]*to authenticated[\s\S]*owner_id = auth\.uid\(\)/i
+    );
+    expect(policies).toMatch(
+      /policy agent_clients_update_owned[\s\S]*for update[\s\S]*to authenticated[\s\S]*owner_id = auth\.uid\(\)/i
+    );
+    expect(policies).toMatch(
+      /policy agent_clients_delete_owned[\s\S]*for delete[\s\S]*to authenticated[\s\S]*owner_id = auth\.uid\(\)/i
+    );
+    expect(policies).not.toMatch(
+      /policy agent_clients_select_owned[\s\S]*ethiomls_private\.is_admin\(\)/i
+    );
+  });
+
+  it("enables RLS on agent client records", () => {
+    expect(policies).toMatch(
+      /alter table public\.agent_clients enable row level security/i
+    );
+    expect(policies).toContain(
+      "public.agent_clients.owner_id must be uuid"
+    );
+  });
+
+  it("limits listing image uploads to authenticated users' own storage folder", () => {
+    expect(policies).toMatch(
+      /policy listing_images_select_public[\s\S]*on storage\.objects[\s\S]*bucket_id = 'listing-images'/i
+    );
+    expect(policies).toMatch(
+      /policy listing_images_insert_own_folder[\s\S]*for insert[\s\S]*to authenticated[\s\S]*bucket_id = 'listing-images'[\s\S]*ethiomls_private\.is_agent_or_admin\(\)[\s\S]*\(storage\.foldername\(name\)\)\[1\] = auth\.uid\(\)::text/i
+    );
+    expect(policies).toMatch(
+      /policy listing_images_update_own_folder[\s\S]*for update[\s\S]*to authenticated[\s\S]*\(storage\.foldername\(name\)\)\[1\] = auth\.uid\(\)::text/i
+    );
+  });
+
   it("keeps activation separate from the canonical schema setup", () => {
     expect(schema).toContain(
       "finish setup by running supabase/rls-policies.sql"
@@ -125,6 +164,13 @@ describe("RLS policy migration contract", () => {
 describe("RLS rollback contract", () => {
   it("drops every policy and disables RLS on all protected tables", () => {
     for (const policy of [
+      "listing_images_update_own_folder",
+      "listing_images_insert_own_folder",
+      "listing_images_select_public",
+      "agent_clients_delete_owned",
+      "agent_clients_update_owned",
+      "agent_clients_insert_owned",
+      "agent_clients_select_owned",
       "profiles_select_own",
       "listings_select_public",
       "listings_select_authenticated",

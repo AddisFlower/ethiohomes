@@ -32,9 +32,9 @@ covering:
 
 ## Before Enabling
 
-1. Back up `public.profiles`, `public.listings`, and
-   `public.showing_requests`.
-2. Record row counts for all three tables.
+1. Back up `public.profiles`, `public.listings`,
+   `public.showing_requests`, and `public.agent_clients`.
+2. Record row counts for all four tables.
 3. Confirm `listings.owner_id` and `showing_requests.agent_owner_id` are UUID.
 4. Confirm the application version that sends authenticated user JWTs is
    deployed to the test environment.
@@ -46,9 +46,11 @@ covering:
 
 1. Run `supabase/rls-policies.sql`.
 2. Run the verification queries at the bottom of that file.
-3. Confirm RLS is enabled for all three tables.
-4. Confirm all eight policies are listed.
-5. Confirm table row counts are unchanged.
+3. Confirm RLS is enabled for all four tables.
+4. Confirm all eight table policies are listed.
+5. Confirm the three `listing_images_*` policies are listed on
+   `storage.objects`.
+6. Confirm table row counts are unchanged.
 
 ## Application Tests
 
@@ -62,6 +64,7 @@ covering:
 4. Submit a showing request for Approved + Active.
 5. Confirm it succeeds, displays the agent contact email, and creates one row.
 6. Confirm showing requests for every other approval/market combination fail.
+7. Confirm listing images still load for public visitors.
 
 ### Incomplete User
 
@@ -86,6 +89,11 @@ covering:
 7. Delete an owned disposable listing.
 8. Confirm Agent A cannot edit, replace photos, or delete Agent B's listings.
 9. Confirm Showing Requests contains only requests for Agent A's listings.
+10. Confirm new or replaced listing photos are stored under
+    `listing-images/AGENT_A_UUID/LISTING_ID/`.
+11. Create, edit, and open client records from the Clients dropdown.
+12. Confirm Client List, Follow-ups, and Automated Alerts show only Agent A's
+    client records.
 
 ### Admin
 
@@ -97,6 +105,8 @@ covering:
    normal owner routes.
 6. Confirm Showing Requests still contains only requests for listings the
    admin personally owns.
+7. Confirm Clients pages show only client records owned by the admin profile,
+   not all agents' clients.
 
 ## Direct REST Abuse Tests
 
@@ -123,6 +133,9 @@ Verify:
    title, MLS ID, or owner snapshots.
 9. Anonymous users cannot insert a showing request for a listing that is not
    Approved + Active.
+10. Agent A cannot upload a Storage object under Agent B's UUID folder.
+11. Anonymous users cannot upload Storage objects to `listing-images`.
+12. Agent A cannot read, update, or delete Agent B's `agent_clients` rows.
 
 These checks can be run with the repository script:
 
@@ -166,7 +179,7 @@ If any required workflow fails:
 
 1. Stop application testing.
 2. Run `supabase/rls-rollback.sql`.
-3. Confirm RLS is disabled on all three tables.
+3. Confirm RLS is disabled on all four tables.
 4. Confirm the application returns to route-level authorization behavior.
 5. Preserve logs and the failing request before changing policy SQL.
 

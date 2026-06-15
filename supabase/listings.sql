@@ -49,6 +49,32 @@ create table if not exists public.showing_requests (
     on delete cascade
 );
 
+create table if not exists public.agent_clients (
+  id text primary key,
+  owner_id uuid not null references public.profiles(id) on delete cascade,
+  name text not null,
+  email text not null,
+  phone text,
+  source text not null default 'Manual',
+  status text not null default 'New',
+  notes text,
+  next_follow_up_at timestamptz,
+  preferred_location text,
+  preferred_property_type text,
+  preferred_transaction_type text,
+  preferred_market_status text,
+  min_price integer,
+  max_price integer,
+  min_bedrooms integer,
+  min_bathrooms integer,
+  alert_enabled boolean not null default false,
+  alert_frequency text not null default 'Immediate',
+  alert_last_sent_at timestamptz,
+  alert_matched_listing_ids text[] not null default '{}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create sequence if not exists public.listing_id_seq
   as integer
   start with 1001
@@ -182,6 +208,10 @@ create index if not exists listings_property_type_idx on public.listings(propert
 create index if not exists showing_requests_agent_owner_id_idx on public.showing_requests(agent_owner_id);
 create index if not exists showing_requests_listing_id_idx on public.showing_requests(listing_id);
 create index if not exists showing_requests_created_at_idx on public.showing_requests(created_at);
+create index if not exists agent_clients_owner_id_idx on public.agent_clients(owner_id);
+create index if not exists agent_clients_status_idx on public.agent_clients(status);
+create index if not exists agent_clients_next_follow_up_at_idx on public.agent_clients(next_follow_up_at);
+create index if not exists agent_clients_alert_enabled_idx on public.agent_clients(alert_enabled);
 
 create or replace function public.set_listings_updated_at()
 returns trigger as $$
@@ -197,6 +227,21 @@ create trigger listings_set_updated_at
 before update on public.listings
 for each row
 execute function public.set_listings_updated_at();
+
+create or replace function public.set_agent_clients_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists agent_clients_set_updated_at on public.agent_clients;
+
+create trigger agent_clients_set_updated_at
+before update on public.agent_clients
+for each row
+execute function public.set_agent_clients_updated_at();
 
 select setval(
   'public.listing_id_seq',

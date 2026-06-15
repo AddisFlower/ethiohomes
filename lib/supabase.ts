@@ -153,21 +153,22 @@ function encodeStoragePath(path: string) {
     .join("/");
 }
 
-export async function uploadServiceRoleStorageObject(
+async function uploadStorageObject(
   bucket: string,
   path: string,
-  file: File
+  file: File,
+  apiKey: string,
+  bearerToken: string
 ) {
   const config = requireSupabaseConfig();
-  const serviceRoleKey = requireServiceRoleKey();
   const encodedPath = encodeStoragePath(path);
   const response = await fetch(
     `${config.storageUrl}/object/${encodeURIComponent(bucket)}/${encodedPath}`,
     {
       method: "POST",
       headers: {
-        apikey: serviceRoleKey,
-        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: apiKey,
+        Authorization: `Bearer ${bearerToken}`,
         "Content-Type": file.type || "application/octet-stream",
         "x-upsert": "true",
       },
@@ -184,4 +185,35 @@ export async function uploadServiceRoleStorageObject(
   return `${config.storageUrl}/object/public/${encodeURIComponent(
     bucket
   )}/${encodedPath}`;
+}
+
+export async function uploadAuthenticatedStorageObject(
+  bucket: string,
+  path: string,
+  file: File,
+  accessToken: string
+) {
+  const { anonKey } = requireSupabaseConfig();
+  return uploadStorageObject(
+    bucket,
+    path,
+    file,
+    anonKey,
+    requireAccessToken(accessToken)
+  );
+}
+
+export async function uploadServiceRoleStorageObject(
+  bucket: string,
+  path: string,
+  file: File
+) {
+  const serviceRoleKey = requireServiceRoleKey();
+  return uploadStorageObject(
+    bucket,
+    path,
+    file,
+    serviceRoleKey,
+    serviceRoleKey
+  );
 }

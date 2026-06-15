@@ -34,6 +34,18 @@ begin
     raise exception
       'RLS migration aborted. public.showing_requests.agent_owner_id must be uuid.';
   end if;
+
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'agent_clients'
+      and column_name = 'owner_id'
+      and data_type <> 'uuid'
+  ) then
+    raise exception
+      'RLS migration aborted. public.agent_clients.owner_id must be uuid.';
+  end if;
 end;
 $$;
 
@@ -121,6 +133,7 @@ execute function ethiomls_private.enforce_listing_owner_update_rules();
 alter table public.profiles enable row level security;
 alter table public.listings enable row level security;
 alter table public.showing_requests enable row level security;
+alter table public.agent_clients enable row level security;
 
 drop policy if exists profiles_select_own on public.profiles;
 create policy profiles_select_own
@@ -229,15 +242,95 @@ using (
   and agent_owner_id = auth.uid()
 );
 
+drop policy if exists agent_clients_select_owned on public.agent_clients;
+create policy agent_clients_select_owned
+on public.agent_clients
+for select
+to authenticated
+using (
+  (select ethiomls_private.is_agent_or_admin())
+  and owner_id = auth.uid()
+);
+
+drop policy if exists agent_clients_insert_owned on public.agent_clients;
+create policy agent_clients_insert_owned
+on public.agent_clients
+for insert
+to authenticated
+with check (
+  (select ethiomls_private.is_agent_or_admin())
+  and owner_id = auth.uid()
+);
+
+drop policy if exists agent_clients_update_owned on public.agent_clients;
+create policy agent_clients_update_owned
+on public.agent_clients
+for update
+to authenticated
+using (
+  (select ethiomls_private.is_agent_or_admin())
+  and owner_id = auth.uid()
+)
+with check (
+  (select ethiomls_private.is_agent_or_admin())
+  and owner_id = auth.uid()
+);
+
+drop policy if exists agent_clients_delete_owned on public.agent_clients;
+create policy agent_clients_delete_owned
+on public.agent_clients
+for delete
+to authenticated
+using (
+  (select ethiomls_private.is_agent_or_admin())
+  and owner_id = auth.uid()
+);
+
+drop policy if exists listing_images_select_public on storage.objects;
+create policy listing_images_select_public
+on storage.objects
+for select
+to anon, authenticated
+using (bucket_id = 'listing-images');
+
+drop policy if exists listing_images_insert_own_folder on storage.objects;
+create policy listing_images_insert_own_folder
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'listing-images'
+  and (select ethiomls_private.is_agent_or_admin())
+  and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+drop policy if exists listing_images_update_own_folder on storage.objects;
+create policy listing_images_update_own_folder
+on storage.objects
+for update
+to authenticated
+using (
+  bucket_id = 'listing-images'
+  and (select ethiomls_private.is_agent_or_admin())
+  and (storage.foldername(name))[1] = auth.uid()::text
+)
+with check (
+  bucket_id = 'listing-images'
+  and (select ethiomls_private.is_agent_or_admin())
+  and (storage.foldername(name))[1] = auth.uid()::text
+);
+
 grant select on public.profiles to authenticated;
 grant select on public.listings to anon, authenticated;
 grant insert, update, delete on public.listings to authenticated;
 grant insert on public.showing_requests to anon, authenticated;
 grant select on public.showing_requests to authenticated;
+grant select, insert, update, delete on public.agent_clients to authenticated;
 grant usage, select on sequence public.listing_id_seq to authenticated;
 grant select, insert, update, delete on public.profiles to service_role;
 grant select, insert, update, delete on public.listings to service_role;
 grant select, insert, update, delete on public.showing_requests to service_role;
+grant select, insert, update, delete on public.agent_clients to service_role;
 grant usage, select on sequence public.listing_id_seq to service_role;
 
 commit;
@@ -247,14 +340,22 @@ commit;
 -- select schemaname, tablename, policyname, roles, cmd
 -- from pg_policies
 -- where schemaname = 'public'
---   and tablename in ('profiles', 'listings', 'showing_requests')
+--   and tablename in ('profiles', 'listings', 'showing_requests', 'agent_clients')
 -- order by tablename, policyname;
+--
+-- select schemaname, tablename, policyname, roles, cmd
+-- from pg_policies
+-- where schemaname = 'storage'
+--   and tablename = 'objects'
+--   and policyname like 'listing_images_%'
+-- order by policyname;
 --
 -- select relname, relrowsecurity
 -- from pg_class
 -- where oid in (
 --   'public.profiles'::regclass,
 --   'public.listings'::regclass,
---   'public.showing_requests'::regclass
+--   'public.showing_requests'::regclass,
+--   'public.agent_clients'::regclass
 -- )
 -- order by relname;

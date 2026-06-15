@@ -4,7 +4,7 @@ import {
   anonymousSupabaseRequest,
   authenticatedSupabaseRequest,
   serviceRoleSupabaseRequest,
-  uploadServiceRoleStorageObject,
+  uploadAuthenticatedStorageObject,
 } from "@/lib/supabase";
 import {
   approvalStatuses,
@@ -358,7 +358,12 @@ function getFileExtension(file: File) {
   return file.type.split("/")[1] || "jpg";
 }
 
-async function uploadListingImage(formData: FormData, listingId: string) {
+async function uploadListingImage(
+  formData: FormData,
+  ownerId: string,
+  listingId: string,
+  accessToken: string
+) {
   const file = getImageFile(formData);
 
   if (!file) {
@@ -366,9 +371,14 @@ async function uploadListingImage(formData: FormData, listingId: string) {
   }
 
   const extension = getFileExtension(file);
-  const path = `${listingId}/primary-${randomUUID()}.${extension}`;
+  const path = `${ownerId}/${listingId}/primary-${randomUUID()}.${extension}`;
 
-  return uploadServiceRoleStorageObject(listingImagesBucket, path, file);
+  return uploadAuthenticatedStorageObject(
+    listingImagesBucket,
+    path,
+    file,
+    accessToken
+  );
 }
 
 async function assertListingOwner(
@@ -541,7 +551,12 @@ export async function createListing(
   accessToken: string
 ) {
   const id = randomUUID();
-  const imageUrl = await uploadListingImage(formData, id);
+  const imageUrl = await uploadListingImage(
+    formData,
+    ownerId,
+    id,
+    accessToken
+  );
   const body = {
     ...fromFormData(formData, "create"),
     id,
@@ -612,7 +627,12 @@ export async function updateListingPhoto(
     accessToken
   );
 
-  const imageUrl = await uploadListingImage(formData, id);
+  const imageUrl = await uploadListingImage(
+    formData,
+    ownerId,
+    id,
+    accessToken
+  );
 
   if (!imageUrl) {
     throw new Error("Please choose a photo to upload.");

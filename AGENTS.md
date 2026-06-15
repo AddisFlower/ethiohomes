@@ -12,8 +12,8 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
     service-role REST request paths.
   - Authenticated requests use the Supabase anon key for `apikey` and the
     signed-in user's access token for the bearer credential.
-  - Storage uploads remain an explicit service-role operation until a
-    dedicated authenticated Storage policy is designed and tested.
+  - Listing image uploads use authenticated Storage requests under
+    owner-scoped object paths backed by Storage policies.
   - `lib/listings.ts` maps Supabase rows to the existing app-facing `Property` shape and formats display labels from real timestamp fields.
 - API routes handle writes:
   - `POST /api/auth/signup` creates Supabase Auth users and agent profiles.
@@ -77,6 +77,15 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Live dashboard counts link to My Listings, Showing Requests, and the admin Unapproved queue.
 - Listing visibility is role-aware for public visitors, agents, owners, and admins.
 - Listing collections default to newest uploaded first using `created_at`.
+- Agent/admin Clients dropdown and outreach workspace are implemented with
+  Client Leads, Client List, Add Client, Follow-ups, and Automated Alerts
+  preparation.
+- Agent-owned client records support contact details, source, status, notes,
+  next follow-up date, saved listing criteria, alert frequency, and matching
+  listing previews.
+- Showing Requests can prefill a new client record through Add to Clients.
+- Automated client email sending is not enabled yet; alert criteria are stored
+  for future email infrastructure.
 - Showing requests are limited to Approved + Active listings in both UI and server logic.
 - Residential room fields are required; Land stores null rooms; Commercial/Office use optional bathrooms and null bedrooms.
 - Add Listing excludes Pending and Closed; Edit Listing supports the full market lifecycle.
@@ -308,6 +317,47 @@ Future client/buyer capabilities should be built on top of the `client` role:
 - Search preferences and alerts.
 - Client-facing saved search or dashboard views.
 
+## Agent Client Outreach Workspace
+The current client-related product direction is agent-side client outreach, not
+public buyer/renter client accounts yet.
+
+Implemented agent/admin Clients dropdown:
+- Client Leads - showing requests and manually entered prospects.
+- Client List - agent-owned client/contact records.
+- Add Client - manual contact creation.
+- Follow-ups - outreach reminders, statuses, and notes.
+- Automated Alerts - saved client criteria that notify clients by email when
+  matching listings become available.
+
+Agent-owned client records should be scoped by the signed-in agent/admin owner.
+Admins should not receive global access to other agents' client contacts unless
+a brokerage/team ownership model is explicitly designed later.
+
+Client outreach schema supports:
+- Contact name, email, optional phone, and source.
+- Client status such as `New`, `Contacted`, `Interested`, `Tour Scheduled`,
+  `Closed`, or `Not Interested`.
+- Notes and next follow-up date.
+- Saved criteria such as budget, location, property type, transaction type,
+  bedrooms, bathrooms, and market status.
+- Alert settings such as enabled/disabled, email frequency, last sent time,
+  and matched listing history to prevent duplicate alerts.
+
+Automated client alerts should not be implemented as browser-local behavior.
+They require server-side persistence, an email provider, unsubscribe/consent
+handling, duplicate suppression, and abuse controls. For the first version, it
+is acceptable to build saved criteria and preview matching listings before
+turning on automatic email sending.
+
+Redfin-inspired TODOs for later product expansion:
+- Map-based listing search.
+- Saved searches and listing alerts.
+- Listing comparison and client shortlists.
+- Tour/showing scheduling workflow.
+- Agent/client listing recommendations based on saved criteria.
+- Valuation/estimate-style features only after price data is normalized and
+  enough reliable local market data exists.
+
 ## Future Ownership Architecture: Agent vs Brokerage
 The current ownership model is:
 
@@ -374,7 +424,15 @@ These are the most urgent architecture and security requirements:
    - Production read failures surface a clear operational state and server logging.
    - Do not reintroduce silent production fallback because outages could look like valid data and mix demo listings with real user expectations.
 
-7. Introduce client accounts only after the items above are complete.
+7. Build the agent-side Clients outreach workspace before public client
+   accounts if agent CRM/outreach remains the immediate product priority.
+   - This is agent-owned contact and follow-up management, not a public
+     buyer/renter login role.
+   - Automated client alerts must use persisted saved criteria and deliberate
+     email infrastructure rather than local-only state.
+
+8. Introduce public client accounts only after the items above are complete and
+   the agent outreach model is stable.
    - Client accounts must not share listing ownership semantics with agents.
    - Client capabilities should be added incrementally after role and database enforcement are stable.
 
@@ -424,6 +482,8 @@ After client accounts are introduced:
 - Add multi-photo galleries and media ordering.
 - Add saved searches, search alerts, and client dashboard views.
 - Consider agent/brokerage analytics, listing views, saves, and inquiry conversion.
+- Expand Redfin-inspired client/search features such as map search, listing
+  comparisons, shortlists, and stronger recommendation/alert workflows.
 
 Showing-request statuses beyond `New` are useful for real agent operations, but `New`-only is acceptable for the current MVP and internal demos.
 
@@ -447,9 +507,9 @@ Top remaining recommendations by priority:
 1. Finish remaining UX bugs found in manual testing.
 2. Complete the remaining direct REST RLS abuse tests before real production
    data or users are introduced.
-3. Decide whether authenticated Storage policies should replace the current
-   explicit service-role image upload path.
-4. Introduce client accounts.
+3. Build the agent-side Clients dropdown/workspace for outreach, follow-ups,
+   saved criteria, and alert preparation.
+4. Introduce public client accounts.
 5. Add favorites, inquiry history, showing-request statuses, and multi-photo
    galleries.
 
@@ -457,8 +517,8 @@ Recommended next implementation slice:
 - Complete the direct REST abuse tests in `docs/rls-rollout-testing.md`.
 - Retain `supabase/rls-rollback.sql` as emergency recovery while the current
   environment contains only disposable test data.
-- Add authenticated Storage upload policies and tests before moving image
-  uploads away from the explicit service-role Storage helper.
+- Apply and verify authenticated Storage upload policies before testing new
+  image uploads in each Supabase environment.
 - Before real production use, repeat the full RLS checklist in a staging
   environment and confirm backups and rollback procedures.
 
@@ -509,8 +569,12 @@ Reason for postponing:
 2. Complete the remaining direct REST RLS abuse tests.
 3. Repeat the full RLS rollout in staging before introducing real production
    data or users.
-4. Introduce client accounts.
-5. Add favorites, inquiry history, showing-request statuses, and multi-photo galleries.
+4. Add the agent-side Clients dropdown/workspace.
+5. Add saved client criteria and manual matching previews.
+6. Add automated client email alerts only after email infrastructure, consent,
+   duplicate suppression, and abuse controls are designed.
+7. Introduce public client accounts.
+8. Add favorites, inquiry history, showing-request statuses, and multi-photo galleries.
 
 ## Manual Testing Checklist
 The current detailed QA scheme is in `docs/qa-manual-testing.md`.
@@ -675,6 +739,41 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Keep MVP changes narrow and verify with `npm run lint`.
 
 ## Next Session Context
+- Latest implemented slice: agent-side Clients outreach workspace.
+  - Agent/admin navbar now includes a Clients dropdown with Client Leads,
+    Client List, Add Client, Follow-ups, and Automated Alerts.
+  - New pages/routes:
+    - `/clients`
+    - `/clients/new`
+    - `/clients/[id]`
+    - `/clients/[id]/edit`
+    - `/clients/follow-ups`
+    - `/clients/alerts`
+    - `POST /api/clients`
+    - `PUT /api/clients/[id]`
+  - New `public.agent_clients` table is defined in `supabase/listings.sql`
+    with owner-scoped contact fields, status, notes, next follow-up,
+    saved listing criteria, and alert-prep fields.
+  - RLS policies in `supabase/rls-policies.sql` keep agent client records
+    owner-only; admins do not get global client/contact visibility.
+  - Showing Requests now include Add to Clients links that prefill the new
+    client form.
+  - Automated Alerts page stores and previews alert criteria only. Actual
+    email sending is not implemented yet and should require provider choice,
+    consent/unsubscribe handling, duplicate suppression, rate limiting, and
+    alert run history.
+  - User applied the updated Supabase SQL and manually tested the Clients
+    workflow successfully.
+  - Local checks passed after implementation:
+    - `npm.cmd run lint`
+    - `npm.cmd run test -- --configLoader runner` with 78 tests
+    - `npm.cmd run build`
+  - Recommended checkpoint commit message:
+    `Add agent client outreach workspace`
+- Previous security slices completed:
+  - Direct REST RLS abuse tests passed.
+  - Authenticated Storage upload policies and user-scoped image uploads were
+    implemented and manually verified.
 - RLS implementation is prepared locally:
   - `supabase/rls-policies.sql` enables policies for profiles, listings, and
     showing requests.
@@ -700,8 +799,8 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
     user's access token as bearer token.
   - Service-role REST requests require the service key explicitly and do not
     fall back to another credential.
-  - Listing image uploads remain explicit service-role Storage requests until
-    authenticated Storage policies are added.
+  - Listing image uploads use authenticated Storage requests under
+    owner-scoped object paths.
 - Public reads/submissions, owner operations, profile reads, showing-request
   reads, admin approval, and signup profile creation are wired to their
   intended credential paths.

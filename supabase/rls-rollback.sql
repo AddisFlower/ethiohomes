@@ -6,8 +6,17 @@
 
 begin;
 
+drop policy if exists listing_images_update_own_folder on storage.objects;
+drop policy if exists listing_images_insert_own_folder on storage.objects;
+drop policy if exists listing_images_select_public on storage.objects;
+
 drop policy if exists showing_requests_select_owned on public.showing_requests;
 drop policy if exists showing_requests_insert_eligible on public.showing_requests;
+
+drop policy if exists agent_clients_delete_owned on public.agent_clients;
+drop policy if exists agent_clients_update_owned on public.agent_clients;
+drop policy if exists agent_clients_insert_owned on public.agent_clients;
+drop policy if exists agent_clients_select_owned on public.agent_clients;
 
 drop policy if exists listings_delete_owned on public.listings;
 drop policy if exists listings_update_owned on public.listings;
@@ -18,6 +27,7 @@ drop policy if exists listings_select_public on public.listings;
 drop policy if exists profiles_select_own on public.profiles;
 
 alter table public.showing_requests disable row level security;
+alter table public.agent_clients disable row level security;
 alter table public.listings disable row level security;
 alter table public.profiles disable row level security;
 

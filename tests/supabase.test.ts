@@ -4,6 +4,7 @@ import {
   authenticatedSupabaseRequest,
   serviceRoleSupabaseAuthRequest,
   serviceRoleSupabaseRequest,
+  uploadAuthenticatedStorageObject,
 } from "@/lib/supabase";
 
 const supabaseUrl = "https://project.supabase.co";
@@ -71,6 +72,31 @@ describe("Supabase credential paths", () => {
           apikey: anonKey,
           Authorization: `Bearer ${accessToken}`,
         }),
+      })
+    );
+  });
+
+  it("uses the anonymous API key and user JWT for authenticated storage uploads", async () => {
+    const file = new File(["photo"], "photo.jpg", { type: "image/jpeg" });
+
+    await uploadAuthenticatedStorageObject(
+      "listing-images",
+      "00000000-0000-4000-8000-000000000001/listing-1/primary.jpg",
+      file,
+      accessToken
+    );
+
+    expect(fetch).toHaveBeenCalledWith(
+      `${supabaseUrl}/storage/v1/object/listing-images/00000000-0000-4000-8000-000000000001/listing-1/primary.jpg`,
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          apikey: anonKey,
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "image/jpeg",
+          "x-upsert": "true",
+        }),
+        body: file,
       })
     );
   });

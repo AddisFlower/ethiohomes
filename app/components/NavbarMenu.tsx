@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-type MenuName = "search" | "listings" | "account";
+type MenuName = "search" | "listings" | "clients" | "account";
 
 type NavbarMenuProps = {
   canUseAdmin: boolean;
@@ -213,6 +213,51 @@ export default function NavbarMenu({
               </div>
             </div>
 
+            {canUseAgent && (
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">
+                  Clients
+                </p>
+                <div className="grid gap-2">
+                  <Link
+                    href="/showing-requests"
+                    onClick={closeMenu}
+                    className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Client Leads
+                  </Link>
+                  <Link
+                    href="/clients"
+                    onClick={closeMenu}
+                    className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Client List
+                  </Link>
+                  <Link
+                    href="/clients/new"
+                    onClick={closeMenu}
+                    className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Add Client
+                  </Link>
+                  <Link
+                    href="/clients/follow-ups"
+                    onClick={closeMenu}
+                    className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Follow-ups
+                  </Link>
+                  <Link
+                    href="/clients/alerts"
+                    onClick={closeMenu}
+                    className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Automated Alerts
+                  </Link>
+                </div>
+              </div>
+            )}
+
             <div className="border-t border-gray-200 pt-4">
               {!isAuthenticated ? (
                 <Link
@@ -351,6 +396,50 @@ export default function NavbarMenu({
               </div>
             </div>
 
+            {canUseAgent && (
+              <div
+                data-navbar-interactive
+                className="relative"
+                onMouseEnter={() => openDesktopMenu("clients")}
+                onMouseLeave={() => closeDesktopMenu("clients")}
+              >
+                <button
+                  type="button"
+                  aria-expanded={openMenu === "clients"}
+                  aria-controls="clients-menu"
+                  onClick={() => toggleMenu("clients")}
+                  className="font-semibold text-gray-800 transition hover:text-emerald-700"
+                >
+                  Clients
+                </button>
+
+                <div
+                  id="clients-menu"
+                  className={`${dropdownClass} ${
+                    openMenu === "clients" ? "block" : "hidden"
+                  }`}
+                >
+                  <div className="flex flex-col gap-3 text-gray-700">
+                    <Link href="/showing-requests" onClick={closeMenu}>
+                      Client Leads
+                    </Link>
+                    <Link href="/clients" onClick={closeMenu}>
+                      Client List
+                    </Link>
+                    <Link href="/clients/new" onClick={closeMenu}>
+                      Add Client
+                    </Link>
+                    <Link href="/clients/follow-ups" onClick={closeMenu}>
+                      Follow-ups
+                    </Link>
+                    <Link href="/clients/alerts" onClick={closeMenu}>
+                      Automated Alerts
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {canUseAdmin && (
               <Link
                 href="/admin"
@@ -408,6 +497,9 @@ export default function NavbarMenu({
                         </Link>
                         <Link href="/add-listing" onClick={closeMenu}>
                           Add Listing
+                        </Link>
+                        <Link href="/clients" onClick={closeMenu}>
+                          Clients
                         </Link>
                       </>
                     )}
