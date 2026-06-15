@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { canUseAdminFeatures, getAppSession } from "@/lib/auth";
 import AgentProfileRequired from "@/components/AgentProfileRequired";
 import {
@@ -147,11 +148,15 @@ export default async function AdminPage({
                     className="bg-white rounded-xl shadow-md overflow-hidden"
                   >
                     <div className="grid grid-cols-1 md:grid-cols-[240px_1fr]">
-                      <img
-                        src={listing.image}
-                        alt={listing.title}
-                        className="h-56 w-full object-cover md:h-full"
-                      />
+                      <div className="relative h-56 w-full md:h-full md:min-h-56">
+                        <Image
+                          src={listing.image}
+                          alt={listing.title}
+                          fill
+                          sizes="(min-width: 768px) 240px, 100vw"
+                          className="object-cover"
+                        />
+                      </div>
 
                       <div className="p-6 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                         <div>

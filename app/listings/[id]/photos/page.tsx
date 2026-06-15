@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import {
   getListingById,
@@ -83,11 +84,15 @@ export default async function ManagePhotosPage({
         </p>
 
         <div className="mb-6">
-          <img
-            src={property.image}
-            alt={property.title}
-            className="h-72 w-full rounded-xl object-cover"
-          />
+          <div className="relative h-72 w-full overflow-hidden rounded-xl">
+            <Image
+              src={property.image}
+              alt={property.title}
+              fill
+              sizes="(min-width: 768px) 672px, 100vw"
+              className="object-cover"
+            />
+          </div>
         </div>
 
         <PhotoManagementForm listingId={property.id} />

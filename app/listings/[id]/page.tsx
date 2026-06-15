@@ -1,3 +1,4 @@
+import Image from "next/image";
 import {
   getListingById,
   isListingReadError,
@@ -67,11 +68,16 @@ export default async function PropertyDetails({
   return (
     <main className="min-h-screen bg-gray-100">
       <div className="max-w-5xl mx-auto py-12 px-6">
-        <img
-          src={property.image}
-          alt={property.title}
-          className="w-full h-[500px] object-cover rounded-2xl mb-8"
-        />
+        <div className="relative mb-8 h-[500px] w-full overflow-hidden rounded-2xl">
+          <Image
+            src={property.image}
+            alt={property.title}
+            fill
+            priority
+            sizes="(min-width: 1024px) 1024px, 100vw"
+            className="object-cover"
+          />
+        </div>
 
         <h1 className="text-5xl font-bold text-black mb-4">
           {property.title}

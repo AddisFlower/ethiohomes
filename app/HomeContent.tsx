@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import type { FormEvent } from "react";
 import { useState } from "react";
@@ -326,11 +327,15 @@ export default function HomeContent({
               key={property.id}
               className="bg-white rounded-xl overflow-hidden shadow-lg hover:scale-105 transition duration-300"
             >
-              <img
-                src={property.image}
-                alt={property.title}
-                className="h-56 w-full object-cover"
-              />
+              <div className="relative h-56 w-full">
+                <Image
+                  src={property.image}
+                  alt={property.title}
+                  fill
+                  sizes="(min-width: 768px) 33vw, 100vw"
+                  className="object-cover"
+                />
+              </div>
 
               <div className="p-5">
                 <div className="flex gap-2 mb-3">

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 function getRecoveryTokens() {
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
@@ -18,45 +18,35 @@ function getRecoveryTokens() {
   };
 }
 
+function subscribeToRecoveryUrl(callback: () => void) {
+  window.addEventListener("hashchange", callback);
+  window.addEventListener("popstate", callback);
+
+  return () => {
+    window.removeEventListener("hashchange", callback);
+    window.removeEventListener("popstate", callback);
+  };
+}
+
 export default function ResetPasswordPage() {
   const router = useRouter();
-  const [recoveryTokens, setRecoveryTokens] = useState<{
-    accessToken: string;
-    refreshToken: string;
-    type: string;
-  } | null>(null);
-  const [hasCheckedRecovery, setHasCheckedRecovery] = useState(false);
+  const recoveryTokens = useSyncExternalStore(
+    subscribeToRecoveryUrl,
+    getRecoveryTokens,
+    () => null
+  );
+  const hasCheckedRecovery = recoveryTokens !== null;
+  const linkError =
+    hasCheckedRecovery && !recoveryTokens?.accessToken
+      ? "Password reset token is missing or expired. Please request a new reset link."
+      : "";
   const [submitError, setSubmitError] = useState("");
-  const [linkError, setLinkError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-
-  useEffect(() => {
-    setRecoveryTokens(getRecoveryTokens());
-    setHasCheckedRecovery(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hasCheckedRecovery) {
-      return;
-    }
-
-    if (!recoveryTokens?.accessToken) {
-      setLinkError(
-        "Password reset token is missing or expired. Please request a new reset link."
-      );
-      return;
-    }
-
-    setLinkError("");
-  }, [hasCheckedRecovery, recoveryTokens]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!recoveryTokens?.accessToken) {
-      setLinkError(
-        "Password reset token is missing or expired. Please request a new reset link."
-      );
       return;
     }
 

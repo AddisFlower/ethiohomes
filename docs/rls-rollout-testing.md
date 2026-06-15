@@ -124,6 +124,42 @@ Verify:
 9. Anonymous users cannot insert a showing request for a listing that is not
    Approved + Active.
 
+These checks can be run with the repository script:
+
+```bash
+npm run test:rls-abuse
+```
+
+Set these environment variables in the shell before running the command, or add
+them temporarily to `.env.local` in a disposable test environment:
+
+```env
+RLS_AGENT_A_EMAIL=
+RLS_AGENT_A_PASSWORD=
+RLS_AGENT_B_EMAIL=
+RLS_AGENT_B_PASSWORD=
+RLS_ADMIN_EMAIL=
+RLS_ADMIN_PASSWORD=
+RLS_AGENT_B_USER_ID=
+RLS_AGENT_B_LISTING_ID=
+RLS_AGENT_A_APPROVED_LISTING_ID=
+RLS_AGENT_B_ACTIVE_LISTING_ID=
+RLS_INELIGIBLE_PUBLIC_LISTING_ID=
+```
+
+Fixture requirements:
+- Listing fixture variables can use either `public.listings.id` or the display
+  `public.listings.listing_id`, such as `MLS-1015`.
+- `RLS_AGENT_B_LISTING_ID` can be any Agent B listing.
+- `RLS_AGENT_A_APPROVED_LISTING_ID` must be an Agent A listing with
+  `approval_status = Approved` and `verified = true`.
+- `RLS_AGENT_B_ACTIVE_LISTING_ID` must be Agent B's Approved + Active listing.
+- `RLS_INELIGIBLE_PUBLIC_LISTING_ID` must be public-readable but not eligible
+  for showings, such as Approved + Coming Soon, Pending, or Closed.
+- If `SUPABASE_SERVICE_ROLE_KEY` is present, the script removes its disposable
+  showing-request rows after the run. Without it, those disposable rows remain
+  for manual cleanup.
+
 ## Rollback
 
 If any required workflow fails:

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { canUseAgentFeatures, getAppSession } from "@/lib/auth";
 import {
@@ -73,11 +74,15 @@ export default async function MyListingsPage() {
               key={property.id}
               className="bg-white rounded-xl overflow-hidden shadow-lg hover:scale-105 transition duration-300"
             >
-              <img
-                src={property.image}
-                alt={property.title}
-                className="h-56 w-full object-cover"
-              />
+              <div className="relative h-56 w-full">
+                <Image
+                  src={property.image}
+                  alt={property.title}
+                  fill
+                  sizes="(min-width: 768px) 33vw, 100vw"
+                  className="object-cover"
+                />
+              </div>
 
               <div className="p-5">
                 <h2 className="text-2xl font-semibold text-black mb-2">

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import type { FormEvent } from "react";
 import type { ReactNode } from "react";
@@ -265,11 +266,15 @@ export default function PropertyForm({
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
           <p className="font-semibold text-black">Primary Property Image</p>
           {defaultValues?.image && (
-            <img
-              src={defaultValues.image}
-              alt="Current listing"
-              className="mt-3 h-48 w-full rounded-lg object-cover"
-            />
+            <div className="relative mt-3 h-48 w-full overflow-hidden rounded-lg">
+              <Image
+                src={defaultValues.image}
+                alt="Current listing"
+                fill
+                sizes="(min-width: 768px) 672px, 100vw"
+                className="object-cover"
+              />
+            </div>
           )}
           <p className="text-sm text-gray-600 mt-3">
             Photo changes use file upload through Manage Photos.

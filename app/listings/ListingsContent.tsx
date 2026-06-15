@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import Link from "next/link";
@@ -205,11 +206,15 @@ export default function ListingsContent({
                 }`}
               >
                 <div className="relative">
-                  <img
-                    src={property.image}
-                    alt={property.title}
-                    className="h-56 w-full object-cover"
-                  />
+                  <div className="relative h-56 w-full">
+                    <Image
+                      src={property.image}
+                      alt={property.title}
+                      fill
+                      sizes="(min-width: 768px) 33vw, 100vw"
+                      className="object-cover"
+                    />
+                  </div>
 
                   {property.approvalStatus === "Rejected" && (
                     <span className="absolute left-3 top-3 rounded-full bg-red-600 px-4 py-2 text-sm font-bold uppercase tracking-wide text-white shadow-lg">
