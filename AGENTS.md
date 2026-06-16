@@ -739,6 +739,118 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
 - Keep MVP changes narrow and verify with `npm run lint`.
 
 ## Next Session Context
+- Planned next slice: complete agent-side automated client listing alert emails.
+  This is still agent-side client outreach, not public client accounts.
+  Implement phase by phase and confirm before each phase if product choices have
+  changed.
+  - Phase 1 - Email scope:
+    - Listing alert emails may include listings with `approval_status = Approved`
+      and market statuses selected on the client alert filter.
+    - Supported alert market statuses: `Coming Soon`, `Active`, and `Closed`.
+    - Default alert market status filter: `Active`.
+    - Exclude `Pending`, `Off Market`, `Unapproved`, and `Rejected` from alert
+      emails.
+    - Match against saved client criteria such as location, property type,
+      transaction type, budget, bedrooms, bathrooms, and selected market
+      statuses. Blank criteria should not filter out listings.
+    - First implementation is manual `Send now`; store frequency values for
+      future `Immediate`, `Daily`, `Weekly`, and `Off` scheduled behavior.
+    - Emails include up to 5 newest matching listings.
+    - Email display name should be the assigned agent's name. The sender email
+      should remain platform-controlled and configurable.
+    - Each listing in the email must include a `View Details` link to that
+      listing detail page.
+  - Phase 2 - Schema:
+    - Add durable alert send history, tentatively `public.client_alert_sends`.
+    - Store one history row per listing included in an email and group rows from
+      the same email with `send_batch_id`.
+    - Do not add a permanent unique constraint on `(agent_client_id,
+      listing_id)` because agents should be able to resend a listing later.
+    - Add or confirm `agent_clients` alert fields:
+      `alert_enabled`, `alert_frequency`, `alert_market_statuses`,
+      `alert_last_checked_at`, and `alert_last_sent_at`.
+    - Use `alert_market_statuses text[] not null default array['Active']`.
+    - Add database constraints for allowed alert frequencies (`Off`,
+      `Immediate`, `Daily`, `Weekly`) and allowed alert market statuses
+      (`Coming Soon`, `Active`, `Closed`).
+    - Keep alert send history owner-scoped by `agent_owner_id`; admins should
+      not get global visibility into other agents' client alert history.
+    - Make alert history visible to the owning agent in the UI.
+  - Phase 3 - Email provider:
+    - Use Resend.
+    - Use generic/rebrand-friendly env vars where possible:
+      `RESEND_API_KEY`, `LISTING_ALERT_FROM_EMAIL`,
+      `LISTING_ALERT_REPLY_TO_EMAIL`, `LISTING_ALERT_PRODUCT_NAME`, and
+      `NEXT_PUBLIC_SITE_URL`.
+    - Initial sender email can be `alerts@ethiomls.com`, but it must be
+      configurable because the product name may change.
+    - From format: `Agent Name <configured sender email>`.
+    - Reply-To should use the agent's Supabase account email when available,
+      falling back to the configured reply-to email.
+    - Failed email attempts should be saved as `Failed` alert history rows with
+      concise error details.
+  - Phase 4 - Server alert engine:
+    - Add a signed-in agent/admin manual send route, tentatively
+      `POST /api/client-alerts/send`.
+    - Send for one owned client record at a time.
+    - Manual `Send now` is allowed even when `alert_enabled = false`; scheduled
+      sends later must require alerts to be enabled.
+    - Default manual sends should exclude previously successful sends.
+    - Load the owned client, find up to 5 eligible matching listings, send the
+      email through Resend, record send history, and update
+      `alert_last_checked_at` plus `alert_last_sent_at` only on success.
+    - No matching listings should return a clean non-send result and should not
+      call Resend.
+  - Phase 5 - Email content:
+    - Use count/location subject when available, such as
+      `3 listings that match your Addis Ababa search`, with fallback
+      `New listings that match your search`.
+    - Include primary listing images when available, but keep the email useful
+      without images.
+    - Copy should read like the assigned agent is talking to the client.
+    - Include listing title, price, location, transaction type, market status,
+      bedrooms/bathrooms when applicable, and direct `View Details` links.
+    - Signature should include agent name, agency name if available, and
+      `via ${LISTING_ALERT_PRODUCT_NAME}`.
+    - For the first manual-send listing alert email, include a lightweight
+      preference sentence asking the client to reply if they no longer want
+      listing updates. TODO: add a real unsubscribe/preference-management
+      option before scheduled or automatic client alert emails are enabled.
+  - Phase 6 - Agent UI:
+    - `/clients/alerts` is the main alert workspace.
+    - `/clients/[id]` should also show a smaller alert panel.
+    - `Send now` should be available from both places, backed by shared server
+      logic.
+    - Start with `/clients/alerts`, then reuse the component on client detail.
+    - Show alert enabled toggle, frequency selector, market-status multi-select,
+      preview matches, `Send now`, last sent/result state, and visible alert
+      history.
+  - Phase 7 - Safety controls:
+    - Respect Resend limits. Resend docs currently describe a default API rate
+      limit of 5 requests per second per team, with `429` responses for rate or
+      quota overages.
+    - Send one Resend request at a time from the app and add a configurable app
+      cap below provider limits, such as `LISTING_ALERT_MAX_SENDS_PER_MINUTE=60`.
+    - Keep a per-client repeat guard for manual sends, such as one manual send
+      per client every 5 minutes.
+    - If Resend returns `429`, record the attempt as `Failed` with a rate/quota
+      message and show it clearly in the UI.
+    - Scheduled sends later should use queue/batched-worker behavior and must
+      not fire all clients at once.
+    - Do not include private lead/contact data from other agents. Do not include
+      Off Market, Pending, Unapproved, or Rejected listings.
+  - Phase 8 - Test plan:
+    - Add schema/RLS tests for alert send history, default market statuses,
+      allowed-value constraints, and owner-only visibility.
+    - Add matching tests for approval/status eligibility, criteria matching,
+      blank criteria behavior, newest-first ordering, cap at 5, and default
+      exclusion of previously successful sends.
+    - Add API tests for signed-out denial, role denial, owner scoping, manual
+      send while disabled, missing client email, no matches, provider failure,
+      success history and timestamp updates, repeat-send guard, and Resend
+      `429` handling.
+    - Add UI/manual QA for `/clients/alerts`, client detail alert panel, send
+      results, alert history, and `View Details` links.
 - Latest implemented slice: agent-side Clients outreach workspace.
   - Agent/admin navbar now includes a Clients dropdown with Client Leads,
     Client List, Add Client, Follow-ups, and Automated Alerts.
@@ -758,10 +870,14 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
     owner-only; admins do not get global client/contact visibility.
   - Showing Requests now include Add to Clients links that prefill the new
     client form.
-  - Automated Alerts page stores and previews alert criteria only. Actual
-    email sending is not implemented yet and should require provider choice,
-    consent/unsubscribe handling, duplicate suppression, rate limiting, and
-    alert run history.
+- Automated Alerts page stores and previews alert criteria only. Actual
+  email sending is not implemented yet and should require provider choice,
+  consent/unsubscribe handling, duplicate suppression, rate limiting, and
+  alert run history.
+- For the first manual-send listing alert email, include a lightweight
+  preference sentence asking the client to reply if they no longer want listing
+  updates. TODO: add a real unsubscribe/preference-management option before
+  scheduled or automatic client alert emails are enabled.
   - User applied the updated Supabase SQL and manually tested the Clients
     workflow successfully.
   - Local checks passed after implementation:
