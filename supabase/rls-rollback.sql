@@ -18,6 +18,9 @@ drop policy if exists agent_clients_update_owned on public.agent_clients;
 drop policy if exists agent_clients_insert_owned on public.agent_clients;
 drop policy if exists agent_clients_select_owned on public.agent_clients;
 
+drop policy if exists client_alert_sends_insert_owned on public.client_alert_sends;
+drop policy if exists client_alert_sends_select_owned on public.client_alert_sends;
+
 drop policy if exists listings_delete_owned on public.listings;
 drop policy if exists listings_update_owned on public.listings;
 drop policy if exists listings_insert_owned on public.listings;
@@ -28,6 +31,7 @@ drop policy if exists profiles_select_own on public.profiles;
 
 alter table public.showing_requests disable row level security;
 alter table public.agent_clients disable row level security;
+alter table public.client_alert_sends disable row level security;
 alter table public.listings disable row level security;
 alter table public.profiles disable row level security;
 

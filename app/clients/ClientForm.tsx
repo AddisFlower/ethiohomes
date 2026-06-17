@@ -4,7 +4,11 @@ import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import type { AgentClient } from "@/lib/clients";
-import { alertFrequencies, clientStatuses } from "@/lib/clients";
+import {
+  alertFrequencies,
+  alertMarketStatuses,
+  clientStatuses,
+} from "@/lib/clients";
 import {
   marketStatuses,
   propertyTypes,
@@ -311,6 +315,36 @@ export default function ClientForm({
                 }
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-black"
               />
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <p className="mb-2 block font-semibold text-black">
+              Alert Market Statuses
+            </p>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {alertMarketStatuses.map((status) => {
+                const selectedStatuses =
+                  client?.alertMarketStatuses ??
+                  defaultValues?.alertMarketStatuses ??
+                  ["Active"];
+
+                return (
+                  <label
+                    key={status}
+                    className="flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 text-black"
+                  >
+                    <input
+                      name="alertMarketStatuses"
+                      type="checkbox"
+                      value={status}
+                      defaultChecked={selectedStatuses.includes(status)}
+                      className="h-5 w-5"
+                    />
+                    {status}
+                  </label>
+                );
+              })}
             </div>
           </div>
         </div>

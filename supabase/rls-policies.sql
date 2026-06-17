@@ -46,6 +46,18 @@ begin
     raise exception
       'RLS migration aborted. public.agent_clients.owner_id must be uuid.';
   end if;
+
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'client_alert_sends'
+      and column_name = 'agent_owner_id'
+      and data_type <> 'uuid'
+  ) then
+    raise exception
+      'RLS migration aborted. public.client_alert_sends.agent_owner_id must be uuid.';
+  end if;
 end;
 $$;
 
@@ -134,6 +146,7 @@ alter table public.profiles enable row level security;
 alter table public.listings enable row level security;
 alter table public.showing_requests enable row level security;
 alter table public.agent_clients enable row level security;
+alter table public.client_alert_sends enable row level security;
 
 drop policy if exists profiles_select_own on public.profiles;
 create policy profiles_select_own
@@ -286,6 +299,26 @@ using (
   and owner_id = auth.uid()
 );
 
+drop policy if exists client_alert_sends_select_owned on public.client_alert_sends;
+create policy client_alert_sends_select_owned
+on public.client_alert_sends
+for select
+to authenticated
+using (
+  (select ethiomls_private.is_agent_or_admin())
+  and agent_owner_id = auth.uid()
+);
+
+drop policy if exists client_alert_sends_insert_owned on public.client_alert_sends;
+create policy client_alert_sends_insert_owned
+on public.client_alert_sends
+for insert
+to authenticated
+with check (
+  (select ethiomls_private.is_agent_or_admin())
+  and agent_owner_id = auth.uid()
+);
+
 drop policy if exists listing_images_select_public on storage.objects;
 create policy listing_images_select_public
 on storage.objects
@@ -326,11 +359,13 @@ grant insert, update, delete on public.listings to authenticated;
 grant insert on public.showing_requests to anon, authenticated;
 grant select on public.showing_requests to authenticated;
 grant select, insert, update, delete on public.agent_clients to authenticated;
+grant select, insert on public.client_alert_sends to authenticated;
 grant usage, select on sequence public.listing_id_seq to authenticated;
 grant select, insert, update, delete on public.profiles to service_role;
 grant select, insert, update, delete on public.listings to service_role;
 grant select, insert, update, delete on public.showing_requests to service_role;
 grant select, insert, update, delete on public.agent_clients to service_role;
+grant select, insert, update, delete on public.client_alert_sends to service_role;
 grant usage, select on sequence public.listing_id_seq to service_role;
 
 commit;
@@ -340,7 +375,13 @@ commit;
 -- select schemaname, tablename, policyname, roles, cmd
 -- from pg_policies
 -- where schemaname = 'public'
---   and tablename in ('profiles', 'listings', 'showing_requests', 'agent_clients')
+--   and tablename in (
+--     'profiles',
+--     'listings',
+--     'showing_requests',
+--     'agent_clients',
+--     'client_alert_sends'
+--   )
 -- order by tablename, policyname;
 --
 -- select schemaname, tablename, policyname, roles, cmd
@@ -356,6 +397,7 @@ commit;
 --   'public.profiles'::regclass,
 --   'public.listings'::regclass,
 --   'public.showing_requests'::regclass,
---   'public.agent_clients'::regclass
+--   'public.agent_clients'::regclass,
+--   'public.client_alert_sends'::regclass
 -- )
 -- order by relname;

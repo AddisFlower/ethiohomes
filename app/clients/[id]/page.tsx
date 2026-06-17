@@ -9,8 +9,10 @@ import {
   getAgentClientById,
   getClientListingMatches,
 } from "@/lib/clients";
+import { getClientAlertHistory } from "@/lib/client-alerts";
 import { getListingsForViewer } from "@/lib/listings";
 import AgentProfileRequired from "@/components/AgentProfileRequired";
+import AlertSendButton from "../alerts/AlertSendButton";
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -70,12 +72,23 @@ export default async function ClientDetailPage({
     );
   }
 
-  const listings = await getListingsForViewer(
-    session.role,
-    session.user.id,
-    isAuthenticated(session) ? session.accessToken : undefined
-  );
+  const [listings, alertHistory] = await Promise.all([
+    getListingsForViewer(
+      session.role,
+      session.user.id,
+      isAuthenticated(session) ? session.accessToken : undefined
+    ),
+    getClientAlertHistory(session.user.id, session.accessToken, client.id),
+  ]);
   const matches = getClientListingMatches(client, listings);
+  const sentListingIds = alertHistory
+    .filter((send) => send.status === "Sent")
+    .map((send) => send.listingId);
+  const alertMatches = getClientListingMatches(client, listings, {
+    alertOnly: true,
+    excludeListingIds: sentListingIds,
+    limit: 5,
+  });
 
   return (
     <main className="min-h-screen bg-gray-100 py-12 px-6">
@@ -223,11 +236,32 @@ export default async function ClientDetailPage({
 
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-blue-900">
               <h2 className="mb-2 text-xl font-bold">Alert Status</h2>
-              <p className="text-sm">
-                {client.alertEnabled
-                  ? "Saved criteria are ready for automated email alerts once email sending is enabled."
-                  : "Automated alerts are disabled for this client."}
-              </p>
+              <div className="space-y-2 text-sm">
+                <p>
+                  {client.alertEnabled
+                    ? `${client.alertFrequency} alert saved.`
+                    : "Alerts are disabled, but manual Send now is available."}
+                </p>
+                <p>Alert markets: {client.alertMarketStatuses.join(", ")}</p>
+                <p>Unsent matches: {alertMatches.length}</p>
+                <p>Last sent: {formatDate(client.alertLastSentAt)}</p>
+              </div>
+              <div className="mt-4">
+                <AlertSendButton clientId={client.id} />
+              </div>
+              {alertHistory[0] && (
+                <div className="mt-4 rounded-lg bg-white/70 p-3 text-sm">
+                  <p className="font-semibold">
+                    Last result: {alertHistory[0].status}
+                  </p>
+                  <p>{alertHistory[0].listingTitle}</p>
+                  {alertHistory[0].errorMessage && (
+                    <p className="mt-1 text-red-700">
+                      {alertHistory[0].errorMessage}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </aside>
         </div>

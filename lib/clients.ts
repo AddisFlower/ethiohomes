@@ -11,10 +11,12 @@ export const clientStatuses = [
   "Not Interested",
 ] as const;
 
-export const alertFrequencies = ["Immediate", "Daily", "Weekly"] as const;
+export const alertFrequencies = ["Off", "Immediate", "Daily", "Weekly"] as const;
+export const alertMarketStatuses = ["Coming Soon", "Active", "Closed"] as const;
 
 export type ClientStatus = (typeof clientStatuses)[number];
 export type AlertFrequency = (typeof alertFrequencies)[number];
+export type AlertMarketStatus = (typeof alertMarketStatuses)[number];
 
 export type AgentClient = {
   id: string;
@@ -36,6 +38,8 @@ export type AgentClient = {
   minBathrooms: number | null;
   alertEnabled: boolean;
   alertFrequency: AlertFrequency;
+  alertMarketStatuses: AlertMarketStatus[];
+  alertLastCheckedAt: string | null;
   alertLastSentAt: string | null;
   alertMatchedListingIds: string[];
   createdAt: string;
@@ -62,6 +66,8 @@ type AgentClientRow = {
   min_bathrooms: number | null;
   alert_enabled: boolean;
   alert_frequency: string;
+  alert_market_statuses?: string[] | null;
+  alert_last_checked_at?: string | null;
   alert_last_sent_at: string | null;
   alert_matched_listing_ids: string[] | null;
   created_at: string;
@@ -81,7 +87,18 @@ function toAlertFrequency(value: string): AlertFrequency {
     return value as AlertFrequency;
   }
 
-  return "Immediate";
+  return "Off";
+}
+
+function toAlertMarketStatuses(
+  value: string[] | null | undefined
+): AlertMarketStatus[] {
+  const statuses =
+    value?.filter((status): status is AlertMarketStatus =>
+      alertMarketStatuses.includes(status as AlertMarketStatus)
+    ) ?? [];
+
+  return statuses.length > 0 ? statuses : ["Active"];
 }
 
 function toAgentClient(row: AgentClientRow): AgentClient {
@@ -105,6 +122,8 @@ function toAgentClient(row: AgentClientRow): AgentClient {
     minBathrooms: row.min_bathrooms,
     alertEnabled: row.alert_enabled,
     alertFrequency: toAlertFrequency(row.alert_frequency),
+    alertMarketStatuses: toAlertMarketStatuses(row.alert_market_statuses),
+    alertLastCheckedAt: row.alert_last_checked_at ?? null,
     alertLastSentAt: row.alert_last_sent_at,
     alertMatchedListingIds: row.alert_matched_listing_ids ?? [],
     createdAt: row.created_at,
@@ -186,6 +205,18 @@ function fromFormData(formData: FormData, ownerId: string) {
     throw new Error("Select a valid alert frequency.");
   }
 
+  const selectedAlertMarketStatuses = formData
+    .getAll("alertMarketStatuses")
+    .map((value) => String(value));
+
+  if (
+    selectedAlertMarketStatuses.some(
+      (status) => !alertMarketStatuses.includes(status as AlertMarketStatus)
+    )
+  ) {
+    throw new Error("Select valid alert market statuses.");
+  }
+
   if (minPrice !== null && maxPrice !== null && minPrice > maxPrice) {
     throw new Error("Minimum price cannot be greater than maximum price.");
   }
@@ -226,6 +257,10 @@ function fromFormData(formData: FormData, ownerId: string) {
     ),
     alert_enabled: formData.get("alertEnabled") === "on",
     alert_frequency: alertFrequency,
+    alert_market_statuses:
+      selectedAlertMarketStatuses.length > 0
+        ? selectedAlertMarketStatuses
+        : ["Active"],
   };
 }
 
@@ -341,11 +376,38 @@ function parsePrice(value: string) {
 
 export function getClientListingMatches(
   client: AgentClient,
-  listings: Property[]
+  listings: Property[],
+  options: {
+    alertOnly?: boolean;
+    excludeListingIds?: string[];
+    limit?: number;
+  } = {}
 ) {
-  return listings.filter((listing) => {
+  const excluded = new Set(options.excludeListingIds ?? []);
+  const matches = listings.filter((listing) => {
     const price = parsePrice(listing.price);
     const location = client.preferredLocation?.toLowerCase();
+
+    if (excluded.has(listing.id)) {
+      return false;
+    }
+
+    if (options.alertOnly) {
+      if (listing.approvalStatus !== "Approved") {
+        return false;
+      }
+
+      if (
+        !alertMarketStatuses.includes(
+          listing.marketStatus as AlertMarketStatus
+        ) ||
+        !client.alertMarketStatuses.includes(
+          listing.marketStatus as AlertMarketStatus
+        )
+      ) {
+        return false;
+      }
+    }
 
     if (
       location &&
@@ -400,4 +462,8 @@ export function getClientListingMatches(
 
     return true;
   });
+
+  return typeof options.limit === "number"
+    ? matches.slice(0, options.limit)
+    : matches;
 }

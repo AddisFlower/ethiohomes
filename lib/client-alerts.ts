@@ -1,0 +1,573 @@
+import { randomUUID } from "node:crypto";
+import type { AgentSession } from "@/lib/auth";
+import {
+  type AgentClient,
+  getAgentClientById,
+  getClientListingMatches,
+} from "@/lib/clients";
+import type { Property } from "@/lib/listings";
+import { authenticatedSupabaseRequest } from "@/lib/supabase";
+
+export type ClientAlertSendStatus = "Sent" | "Failed";
+
+export type ClientAlertSend = {
+  id: string;
+  sendBatchId: string;
+  agentClientId: string;
+  agentOwnerId: string;
+  listingId: string;
+  listingTitle: string;
+  listingMlsId: string;
+  recipientEmail: string;
+  status: ClientAlertSendStatus;
+  resendEmailId: string | null;
+  errorMessage: string | null;
+  sentAt: string;
+  createdAt: string;
+};
+
+type ClientAlertSendRow = {
+  id: string;
+  send_batch_id: string;
+  agent_client_id: string;
+  agent_owner_id: string;
+  listing_id: string;
+  listing_title: string;
+  listing_mls_id: string;
+  recipient_email: string;
+  status: string;
+  resend_email_id: string | null;
+  error_message: string | null;
+  sent_at: string;
+  created_at: string;
+};
+
+type ResendEmailResponse = {
+  id?: string;
+  message?: string;
+  name?: string;
+  error?: unknown;
+};
+
+const maxListingsPerEmail = 5;
+const manualRepeatGuardMs = 5 * 60 * 1000;
+const resendEndpoint = "https://api.resend.com/emails";
+const sendTimestamps: number[] = [];
+
+function toClientAlertSend(row: ClientAlertSendRow): ClientAlertSend {
+  return {
+    id: row.id,
+    sendBatchId: row.send_batch_id,
+    agentClientId: row.agent_client_id,
+    agentOwnerId: row.agent_owner_id,
+    listingId: row.listing_id,
+    listingTitle: row.listing_title,
+    listingMlsId: row.listing_mls_id,
+    recipientEmail: row.recipient_email,
+    status: row.status === "Sent" ? "Sent" : "Failed",
+    resendEmailId: row.resend_email_id,
+    errorMessage: row.error_message,
+    sentAt: row.sent_at,
+    createdAt: row.created_at,
+  };
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function getProductName() {
+  return process.env.LISTING_ALERT_PRODUCT_NAME?.trim() || "EthioMLS";
+}
+
+function getSenderEmail() {
+  const sender = process.env.LISTING_ALERT_FROM_EMAIL?.trim();
+
+  if (!sender) {
+    throw new Error("LISTING_ALERT_FROM_EMAIL is not configured.");
+  }
+
+  return sender;
+}
+
+function getResendApiKey() {
+  const key = process.env.RESEND_API_KEY?.trim();
+
+  if (!key) {
+    throw new Error("RESEND_API_KEY is not configured.");
+  }
+
+  return key;
+}
+
+function getReplyToEmail(session: AgentSession) {
+  return (
+    session.user.email?.trim() ||
+    process.env.LISTING_ALERT_REPLY_TO_EMAIL?.trim() ||
+    undefined
+  );
+}
+
+function getAgentName(session: AgentSession) {
+  return (
+    session.profile.full_name?.trim() ||
+    session.user.userMetadata?.full_name?.trim() ||
+    session.user.userMetadata?.name?.trim() ||
+    "Your agent"
+  );
+}
+
+function getConfiguredRateLimit() {
+  const value = Number(process.env.LISTING_ALERT_MAX_SENDS_PER_MINUTE ?? 60);
+  return Number.isInteger(value) && value > 0 ? value : 60;
+}
+
+function assertWithinRateLimit(now = Date.now()) {
+  const cutoff = now - 60_000;
+
+  while (sendTimestamps.length > 0 && sendTimestamps[0] < cutoff) {
+    sendTimestamps.shift();
+  }
+
+  if (sendTimestamps.length >= getConfiguredRateLimit()) {
+    throw new Error("Listing alert send limit reached. Try again shortly.");
+  }
+
+  sendTimestamps.push(now);
+}
+
+function buildListingUrl(siteUrl: string, listing: Property) {
+  return `${siteUrl.replace(/\/$/, "")}/listings/${encodeURIComponent(
+    listing.id
+  )}`;
+}
+
+function buildSubject(client: AgentClient, listings: Property[]) {
+  const location = client.preferredLocation?.trim();
+
+  if (location) {
+    return `${listings.length} listings that match your ${location} search`;
+  }
+
+  return "New listings that match your search";
+}
+
+function getRoomSummary(listing: Property) {
+  const rooms = [
+    listing.bedrooms === null ? null : `${listing.bedrooms} bed`,
+    listing.bathrooms === null ? null : `${listing.bathrooms} bath`,
+  ].filter(Boolean);
+
+  return rooms.length > 0 ? rooms.join(", ") : "Room count not listed";
+}
+
+function buildEmailContent(
+  client: AgentClient,
+  listings: Property[],
+  session: AgentSession,
+  siteUrl: string
+) {
+  const agentName = getAgentName(session);
+  const agencyName = session.profile.agency_name?.trim();
+  const productName = getProductName();
+  const listingLines = listings
+    .map((listing, index) => {
+      const url = buildListingUrl(siteUrl, listing);
+      return `${index + 1}. ${listing.title}
+${listing.price} - ${listing.location}
+${listing.propertyType} / ${listing.transactionType} / ${listing.marketStatus}
+${getRoomSummary(listing)}
+View Details: ${url}`;
+    })
+    .join("\n\n");
+
+  const htmlListings = listings
+    .map((listing) => {
+      const url = buildListingUrl(siteUrl, listing);
+      return `<article style="border:1px solid #d1d5db;border-radius:8px;padding:16px;margin:16px 0;">
+        ${
+          listing.image
+            ? `<img src="${escapeHtml(
+                listing.image
+              )}" alt="" style="width:100%;max-width:560px;border-radius:6px;margin-bottom:12px;" />`
+            : ""
+        }
+        <h2 style="margin:0 0 8px;font-size:20px;color:#111827;">${escapeHtml(
+          listing.title
+        )}</h2>
+        <p style="margin:0 0 8px;color:#374151;">${escapeHtml(
+          listing.price
+        )} - ${escapeHtml(listing.location)}</p>
+        <p style="margin:0 0 12px;color:#4b5563;">${escapeHtml(
+          listing.propertyType
+        )} / ${escapeHtml(listing.transactionType)} / ${escapeHtml(
+          listing.marketStatus
+        )} / ${escapeHtml(getRoomSummary(listing))}</p>
+        <a href="${escapeHtml(
+          url
+        )}" style="display:inline-block;background:#047857;color:#ffffff;text-decoration:none;border-radius:6px;padding:10px 14px;font-weight:600;">View Details</a>
+      </article>`;
+    })
+    .join("");
+
+  const signature = agencyName
+    ? `${agentName}, ${agencyName} via ${productName}`
+    : `${agentName} via ${productName}`;
+
+  return {
+    subject: buildSubject(client, listings),
+    text: `Hi ${client.name},
+
+I found a few listings that match what you are looking for.
+
+${listingLines}
+
+Reply to this email if you no longer want listing updates from me.
+
+${signature}`,
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:640px;">
+      <p>Hi ${escapeHtml(client.name)},</p>
+      <p>I found a few listings that match what you are looking for.</p>
+      ${htmlListings}
+      <p style="color:#4b5563;">Reply to this email if you no longer want listing updates from me.</p>
+      <p>${escapeHtml(signature)}</p>
+    </div>`,
+  };
+}
+
+async function sendResendEmail({
+  client,
+  listings,
+  session,
+  siteUrl,
+  batchId,
+}: {
+  client: AgentClient;
+  listings: Property[];
+  session: AgentSession;
+  siteUrl: string;
+  batchId: string;
+}) {
+  assertWithinRateLimit();
+
+  const agentName = getAgentName(session);
+  const { subject, html, text } = buildEmailContent(
+    client,
+    listings,
+    session,
+    siteUrl
+  );
+  const response = await fetch(resendEndpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${getResendApiKey()}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": batchId,
+    },
+    body: JSON.stringify({
+      from: `${agentName} <${getSenderEmail()}>`,
+      to: [client.email],
+      reply_to: getReplyToEmail(session),
+      subject,
+      html,
+      text,
+    }),
+  });
+  const body = (await response.json().catch(() => ({}))) as ResendEmailResponse;
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error("Resend rate or quota limit reached. Try again later.");
+    }
+
+    throw new Error(
+      body.message || body.name || "Resend email delivery failed."
+    );
+  }
+
+  if (!body.id) {
+    throw new Error("Resend did not return an email ID.");
+  }
+
+  return body.id;
+}
+
+async function getSuccessfullySentListingIds(
+  clientId: string,
+  ownerId: string,
+  accessToken: string
+) {
+  const rows = await authenticatedSupabaseRequest<
+    Pick<ClientAlertSendRow, "listing_id">[]
+  >(
+    `/client_alert_sends?select=listing_id&agent_client_id=eq.${encodeURIComponent(
+      clientId
+    )}&agent_owner_id=eq.${encodeURIComponent(
+      ownerId
+    )}&status=eq.Sent`,
+    accessToken
+  );
+
+  return rows.map((row) => row.listing_id);
+}
+
+async function getRecentSend(
+  clientId: string,
+  ownerId: string,
+  accessToken: string
+) {
+  const cutoff = encodeURIComponent(
+    new Date(Date.now() - manualRepeatGuardMs).toISOString()
+  );
+  const rows = await authenticatedSupabaseRequest<ClientAlertSendRow[]>(
+    `/client_alert_sends?select=*&agent_client_id=eq.${encodeURIComponent(
+      clientId
+    )}&agent_owner_id=eq.${encodeURIComponent(
+      ownerId
+    )}&sent_at=gte.${cutoff}&order=sent_at.desc&limit=1`,
+    accessToken
+  );
+
+  return rows[0] ? toClientAlertSend(rows[0]) : null;
+}
+
+async function updateAlertTimestamps(
+  client: AgentClient,
+  accessToken: string,
+  checkedAt: string,
+  sentAt?: string,
+  matchedListingIds?: string[]
+) {
+  await authenticatedSupabaseRequest(
+    `/agent_clients?id=eq.${encodeURIComponent(
+      client.id
+    )}&owner_id=eq.${encodeURIComponent(client.ownerId)}`,
+    accessToken,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        alert_last_checked_at: checkedAt,
+        ...(sentAt
+          ? {
+              alert_last_sent_at: sentAt,
+              alert_matched_listing_ids: matchedListingIds ?? [],
+            }
+          : {}),
+      }),
+    }
+  );
+}
+
+async function recordAlertSendRows({
+  client,
+  listings,
+  ownerId,
+  accessToken,
+  batchId,
+  status,
+  resendEmailId = null,
+  errorMessage = null,
+  sentAt,
+}: {
+  client: AgentClient;
+  listings: Property[];
+  ownerId: string;
+  accessToken: string;
+  batchId: string;
+  status: ClientAlertSendStatus;
+  resendEmailId?: string | null;
+  errorMessage?: string | null;
+  sentAt: string;
+}) {
+  const rows = listings.map((listing) => ({
+    id: randomUUID(),
+    send_batch_id: batchId,
+    agent_client_id: client.id,
+    agent_owner_id: ownerId,
+    listing_id: listing.id,
+    listing_title: listing.title,
+    listing_mls_id: listing.listingId,
+    recipient_email: client.email,
+    status,
+    resend_email_id: resendEmailId,
+    error_message: errorMessage?.slice(0, 300) ?? null,
+    sent_at: sentAt,
+  }));
+
+  return authenticatedSupabaseRequest<ClientAlertSendRow[]>(
+    "/client_alert_sends",
+    accessToken,
+    {
+      method: "POST",
+      headers: {
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify(rows),
+    }
+  );
+}
+
+export async function getClientAlertHistory(
+  ownerId: string,
+  accessToken: string,
+  clientId?: string
+) {
+  const clientFilter = clientId
+    ? `&agent_client_id=eq.${encodeURIComponent(clientId)}`
+    : "";
+  const rows = await authenticatedSupabaseRequest<ClientAlertSendRow[]>(
+    `/client_alert_sends?select=*&agent_owner_id=eq.${encodeURIComponent(
+      ownerId
+    )}${clientFilter}&order=sent_at.desc&limit=50`,
+    accessToken
+  );
+
+  return rows.map(toClientAlertSend);
+}
+
+export async function sendListingAlertNow({
+  clientId,
+  listings,
+  session,
+  siteUrl,
+}: {
+  clientId: string;
+  listings: Property[];
+  session: AgentSession;
+  siteUrl: string;
+}) {
+  const checkedAt = new Date().toISOString();
+  const client = await getAgentClientById(
+    clientId,
+    session.user.id,
+    session.accessToken
+  );
+
+  if (!client) {
+    return {
+      ok: false,
+      status: 404,
+      message: "Client not found or access denied.",
+      sentCount: 0,
+    };
+  }
+
+  if (!client.email) {
+    await updateAlertTimestamps(client, session.accessToken, checkedAt);
+    return {
+      ok: false,
+      status: 400,
+      message: "Client email is required before sending an alert.",
+      sentCount: 0,
+    };
+  }
+
+  const recentSend = await getRecentSend(
+    client.id,
+    session.user.id,
+    session.accessToken
+  );
+
+  if (recentSend) {
+    return {
+      ok: false,
+      status: 429,
+      message: "Wait at least 5 minutes before sending this client another alert.",
+      sentCount: 0,
+    };
+  }
+
+  const previouslySentListingIds = await getSuccessfullySentListingIds(
+    client.id,
+    session.user.id,
+    session.accessToken
+  );
+  const matches = getClientListingMatches(client, listings, {
+    alertOnly: true,
+    excludeListingIds: previouslySentListingIds,
+    limit: maxListingsPerEmail,
+  });
+
+  if (matches.length === 0) {
+    await updateAlertTimestamps(client, session.accessToken, checkedAt);
+    return {
+      ok: true,
+      status: 200,
+      message: "No unsent matching listings found.",
+      sentCount: 0,
+    };
+  }
+
+  const batchId = randomUUID();
+
+  try {
+    const resendEmailId = await sendResendEmail({
+      client,
+      listings: matches,
+      session,
+      siteUrl,
+      batchId,
+    });
+    const sentAt = new Date().toISOString();
+    const rows = await recordAlertSendRows({
+      client,
+      listings: matches,
+      ownerId: session.user.id,
+      accessToken: session.accessToken,
+      batchId,
+      status: "Sent",
+      resendEmailId,
+      sentAt,
+    });
+
+    await updateAlertTimestamps(
+      client,
+      session.accessToken,
+      checkedAt,
+      sentAt,
+      matches.map((listing) => listing.id)
+    );
+
+    return {
+      ok: true,
+      status: 200,
+      message: `Sent ${matches.length} listing${
+        matches.length === 1 ? "" : "s"
+      } to ${client.email}.`,
+      sentCount: matches.length,
+      history: rows.map(toClientAlertSend),
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Listing alert email failed.";
+    const failedAt = new Date().toISOString();
+    const rows = await recordAlertSendRows({
+      client,
+      listings: matches,
+      ownerId: session.user.id,
+      accessToken: session.accessToken,
+      batchId,
+      status: "Failed",
+      errorMessage: message,
+      sentAt: failedAt,
+    });
+
+    await updateAlertTimestamps(client, session.accessToken, checkedAt);
+
+    return {
+      ok: false,
+      status: message.includes("limit") ? 429 : 502,
+      message,
+      sentCount: 0,
+      history: rows.map(toClientAlertSend),
+    };
+  }
+}

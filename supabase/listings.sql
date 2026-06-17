@@ -68,11 +68,48 @@ create table if not exists public.agent_clients (
   min_bedrooms integer,
   min_bathrooms integer,
   alert_enabled boolean not null default false,
-  alert_frequency text not null default 'Immediate',
+  alert_frequency text not null default 'Off',
+  alert_market_statuses text[] not null default array['Active'],
+  alert_last_checked_at timestamptz,
   alert_last_sent_at timestamptz,
   alert_matched_listing_ids text[] not null default '{}',
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (id, owner_id)
+);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'agent_clients_id_owner_id_unique'
+      and conrelid = 'public.agent_clients'::regclass
+  ) then
+    alter table public.agent_clients
+    add constraint agent_clients_id_owner_id_unique
+    unique (id, owner_id);
+  end if;
+end;
+$$;
+
+create table if not exists public.client_alert_sends (
+  id text primary key,
+  send_batch_id text not null,
+  agent_client_id text not null references public.agent_clients(id) on delete cascade,
+  agent_owner_id uuid not null references public.profiles(id) on delete cascade,
+  listing_id text not null references public.listings(id) on delete cascade,
+  listing_title text not null,
+  listing_mls_id text not null,
+  recipient_email text not null,
+  status text not null default 'Sent',
+  resend_email_id text,
+  error_message text,
+  sent_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  foreign key (agent_client_id, agent_owner_id)
+    references public.agent_clients(id, owner_id)
+    on delete cascade
 );
 
 create sequence if not exists public.listing_id_seq
@@ -212,6 +249,66 @@ create index if not exists agent_clients_owner_id_idx on public.agent_clients(ow
 create index if not exists agent_clients_status_idx on public.agent_clients(status);
 create index if not exists agent_clients_next_follow_up_at_idx on public.agent_clients(next_follow_up_at);
 create index if not exists agent_clients_alert_enabled_idx on public.agent_clients(alert_enabled);
+create index if not exists client_alert_sends_agent_owner_id_idx on public.client_alert_sends(agent_owner_id);
+create index if not exists client_alert_sends_agent_client_id_idx on public.client_alert_sends(agent_client_id);
+create index if not exists client_alert_sends_listing_id_idx on public.client_alert_sends(listing_id);
+create index if not exists client_alert_sends_sent_at_idx on public.client_alert_sends(sent_at);
+
+alter table public.agent_clients
+add column if not exists alert_market_statuses text[] not null default array['Active'];
+
+alter table public.agent_clients
+add column if not exists alert_last_checked_at timestamptz;
+
+update public.agent_clients
+set alert_frequency = 'Off'
+where alert_frequency is null
+  or alert_frequency not in ('Off', 'Immediate', 'Daily', 'Weekly');
+
+update public.agent_clients
+set alert_market_statuses = array['Active']
+where alert_market_statuses is null
+  or cardinality(alert_market_statuses) = 0;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'agent_clients_alert_frequency_check'
+      and conrelid = 'public.agent_clients'::regclass
+  ) then
+    alter table public.agent_clients
+    add constraint agent_clients_alert_frequency_check
+    check (alert_frequency in ('Off', 'Immediate', 'Daily', 'Weekly'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'agent_clients_alert_market_statuses_check'
+      and conrelid = 'public.agent_clients'::regclass
+  ) then
+    alter table public.agent_clients
+    add constraint agent_clients_alert_market_statuses_check
+    check (
+      alert_market_statuses <@ array['Coming Soon', 'Active', 'Closed']::text[]
+      and cardinality(alert_market_statuses) > 0
+    );
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'client_alert_sends_status_check'
+      and conrelid = 'public.client_alert_sends'::regclass
+  ) then
+    alter table public.client_alert_sends
+    add constraint client_alert_sends_status_check
+    check (status in ('Sent', 'Failed'));
+  end if;
+end;
+$$;
 
 create or replace function public.set_listings_updated_at()
 returns trigger as $$
