@@ -955,6 +955,15 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
   - Vercel Cron is not configured yet. First production use should call the
     route with `dryRun: true`, inspect results, then enable non-dry-run with a
     small limit.
+  - Deployed runner smoke test passed:
+    - `CLIENT_ALERT_RUN_SECRET` was configured in Vercel.
+    - Dry run returned one eligible Immediate-frequency client and sent no
+      emails.
+    - A live run with `dryRun: false` and `limit: 1` sent 3 matching listings
+      to a tester-controlled email address.
+    - A follow-up dry run returned no new matching listings, confirming
+      already-sent listing suppression.
+    - Local git working tree was clean after the scheduled-runner checkpoint.
   - Recommended checkpoint commit message:
     `Harden showing requests and add public agent contact email`
 - Previous implemented slice: manual agent-side client listing alert emails and
