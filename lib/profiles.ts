@@ -13,6 +13,13 @@ type ProfileContactRow = {
   public_contact_email: string | null;
 };
 
+type AlertSenderProfileRow = {
+  id: string;
+  full_name: string | null;
+  agency_name: string | null;
+  public_contact_email: string | null;
+};
+
 function assertEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
@@ -111,4 +118,24 @@ export async function getPublicContactEmailForProfile(profileId: string) {
   const email = rows[0]?.public_contact_email?.trim();
 
   return email && assertEmail(email) ? email : null;
+}
+
+export async function getAlertSenderProfile(profileId: string) {
+  const rows = await serviceRoleSupabaseRequest<AlertSenderProfileRow[]>(
+    `/profiles?select=id,full_name,agency_name,public_contact_email&id=eq.${encodeURIComponent(
+      profileId
+    )}&limit=1`
+  );
+  const profile = rows[0];
+
+  if (!profile) {
+    return null;
+  }
+
+  return {
+    id: profile.id,
+    fullName: profile.full_name,
+    agencyName: profile.agency_name,
+    email: profile.public_contact_email,
+  };
 }

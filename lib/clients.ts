@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { authenticatedSupabaseRequest } from "@/lib/supabase";
+import {
+  authenticatedSupabaseRequest,
+  serviceRoleSupabaseRequest,
+} from "@/lib/supabase";
 import type { Property } from "@/lib/listings";
 
 export const clientStatuses = [
@@ -324,6 +327,16 @@ export async function getAlertEnabledClients(
       ownerId
     )}&alert_enabled=eq.true&order=updated_at.desc`,
     accessToken
+  );
+
+  return rows.map(toAgentClient);
+}
+
+export async function getScheduledAlertClients(limit: number) {
+  const rows = await serviceRoleSupabaseRequest<AgentClientRow[]>(
+    `/agent_clients?select=*&alert_enabled=eq.true&alert_consent_at=not.is.null&alert_unsubscribed_at=is.null&order=alert_last_checked_at.asc.nullsfirst,updated_at.asc&limit=${encodeURIComponent(
+      String(limit)
+    )}`
   );
 
   return rows.map(toAgentClient);

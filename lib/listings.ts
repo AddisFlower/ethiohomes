@@ -417,6 +417,14 @@ export async function getListings(): Promise<Property[]> {
   );
 }
 
+export async function getAlertListingsForAutomation(): Promise<Property[]> {
+  const rows = await serviceRoleSupabaseRequest<ListingRow[]>(
+    "/listings?select=*&approval_status=eq.Approved&market_status=in.(Coming%20Soon,Active,Closed)&order=created_at.desc"
+  );
+
+  return rows.map(toProperty);
+}
+
 export async function getListingsForViewer(
   role: "public" | "incomplete" | "agent" | "admin",
   userId?: string,

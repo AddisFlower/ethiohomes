@@ -7,7 +7,10 @@ import {
   getClientListingMatches,
 } from "@/lib/clients";
 import type { Property } from "@/lib/listings";
-import { authenticatedSupabaseRequest } from "@/lib/supabase";
+import {
+  authenticatedSupabaseRequest,
+  serviceRoleSupabaseRequest,
+} from "@/lib/supabase";
 
 export type ClientAlertSendStatus = "Sent" | "Failed";
 
@@ -48,6 +51,12 @@ type ResendEmailResponse = {
   message?: string;
   name?: string;
   error?: unknown;
+};
+
+export type AlertSender = {
+  email?: string | null;
+  fullName?: string | null;
+  agencyName?: string | null;
 };
 
 const maxListingsPerEmail = 5;
@@ -106,19 +115,17 @@ function getResendApiKey() {
   return key;
 }
 
-function getReplyToEmail(session: AgentSession) {
+function getReplyToEmail(sender: AlertSender) {
   return (
-    session.user.email?.trim() ||
+    sender.email?.trim() ||
     process.env.LISTING_ALERT_REPLY_TO_EMAIL?.trim() ||
     undefined
   );
 }
 
-function getAgentName(session: AgentSession) {
+function getAgentName(sender: AlertSender) {
   return (
-    session.profile.full_name?.trim() ||
-    session.user.userMetadata?.full_name?.trim() ||
-    session.user.userMetadata?.name?.trim() ||
+    sender.fullName?.trim() ||
     "Your agent"
   );
 }
@@ -183,11 +190,11 @@ function getRoomSummary(listing: Property) {
 function buildEmailContent(
   client: AgentClient,
   listings: Property[],
-  session: AgentSession,
+  sender: AlertSender,
   siteUrl: string
 ) {
-  const agentName = getAgentName(session);
-  const agencyName = session.profile.agency_name?.trim();
+  const agentName = getAgentName(sender);
+  const agencyName = sender.agencyName?.trim();
   const productName = getProductName();
   const unsubscribeUrl = buildUnsubscribeUrl(siteUrl, client);
   const listingLines = listings
@@ -269,22 +276,32 @@ async function sendResendEmail({
   client,
   listings,
   session,
+  sender,
   siteUrl,
   batchId,
 }: {
   client: AgentClient;
   listings: Property[];
-  session: AgentSession;
+  session?: AgentSession;
+  sender?: AlertSender;
   siteUrl: string;
   batchId: string;
 }) {
   assertWithinRateLimit();
 
-  const agentName = getAgentName(session);
+  const alertSender = sender ?? {
+    email: session?.user.email,
+    fullName:
+      session?.profile.full_name ??
+      session?.user.userMetadata?.full_name ??
+      session?.user.userMetadata?.name,
+    agencyName: session?.profile.agency_name,
+  };
+  const agentName = getAgentName(alertSender);
   const { subject, html, text } = buildEmailContent(
     client,
     listings,
-    session,
+    alertSender,
     siteUrl
   );
   const response = await fetch(resendEndpoint, {
@@ -297,7 +314,7 @@ async function sendResendEmail({
     body: JSON.stringify({
       from: `${agentName} <${getSenderEmail()}>`,
       to: [client.email],
-      reply_to: getReplyToEmail(session),
+      reply_to: getReplyToEmail(alertSender),
       subject,
       html,
       text,
@@ -336,6 +353,23 @@ async function getSuccessfullySentListingIds(
       ownerId
     )}&status=eq.Sent`,
     accessToken
+  );
+
+  return rows.map((row) => row.listing_id);
+}
+
+async function getSuccessfullySentListingIdsWithServiceRole(
+  clientId: string,
+  ownerId: string
+) {
+  const rows = await serviceRoleSupabaseRequest<
+    Pick<ClientAlertSendRow, "listing_id">[]
+  >(
+    `/client_alert_sends?select=listing_id&agent_client_id=eq.${encodeURIComponent(
+      clientId
+    )}&agent_owner_id=eq.${encodeURIComponent(
+      ownerId
+    )}&status=eq.Sent`
   );
 
   return rows.map((row) => row.listing_id);
@@ -414,6 +448,34 @@ async function updateAlertTimestamps(
   );
 }
 
+async function updateAlertTimestampsWithServiceRole(
+  client: AgentClient,
+  checkedAt: string,
+  sentAt?: string,
+  matchedListingIds?: string[]
+) {
+  await serviceRoleSupabaseRequest(
+    `/agent_clients?id=eq.${encodeURIComponent(
+      client.id
+    )}&owner_id=eq.${encodeURIComponent(client.ownerId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        alert_last_checked_at: checkedAt,
+        ...(sentAt
+          ? {
+              alert_last_sent_at: sentAt,
+              alert_matched_listing_ids: matchedListingIds ?? [],
+            }
+          : {}),
+      }),
+    }
+  );
+}
+
 async function recordAlertSendRows({
   client,
   listings,
@@ -453,6 +515,52 @@ async function recordAlertSendRows({
   return authenticatedSupabaseRequest<ClientAlertSendRow[]>(
     "/client_alert_sends",
     accessToken,
+    {
+      method: "POST",
+      headers: {
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify(rows),
+    }
+  );
+}
+
+async function recordAlertSendRowsWithServiceRole({
+  client,
+  listings,
+  ownerId,
+  batchId,
+  status,
+  resendEmailId = null,
+  errorMessage = null,
+  sentAt,
+}: {
+  client: AgentClient;
+  listings: Property[];
+  ownerId: string;
+  batchId: string;
+  status: ClientAlertSendStatus;
+  resendEmailId?: string | null;
+  errorMessage?: string | null;
+  sentAt: string;
+}) {
+  const rows = listings.map((listing) => ({
+    id: randomUUID(),
+    send_batch_id: batchId,
+    agent_client_id: client.id,
+    agent_owner_id: ownerId,
+    listing_id: listing.id,
+    listing_title: listing.title,
+    listing_mls_id: listing.listingId,
+    recipient_email: client.email,
+    status,
+    resend_email_id: resendEmailId,
+    error_message: errorMessage?.slice(0, 300) ?? null,
+    sent_at: sentAt,
+  }));
+
+  return serviceRoleSupabaseRequest<ClientAlertSendRow[]>(
+    "/client_alert_sends",
     {
       method: "POST",
       headers: {
@@ -676,6 +784,170 @@ export async function sendListingAlertNow({
       status: message.includes("limit") ? 429 : 502,
       message,
       sentCount: 0,
+      history: rows.map(toClientAlertSend),
+    };
+  }
+}
+
+export async function sendScheduledListingAlert({
+  client,
+  dryRun = true,
+  listings,
+  sender,
+  siteUrl,
+}: {
+  client: AgentClient;
+  dryRun?: boolean;
+  listings: Property[];
+  sender: AlertSender;
+  siteUrl: string;
+}) {
+  const checkedAt = new Date().toISOString();
+
+  if (!client.alertEnabled || !client.alertConsentAt) {
+    return {
+      ok: true,
+      status: 200,
+      message: "Client is not enabled for scheduled alerts.",
+      sentCount: 0,
+      matchCount: 0,
+      skipped: true,
+    };
+  }
+
+  if (!client.email) {
+    if (!dryRun) {
+      await updateAlertTimestampsWithServiceRole(client, checkedAt);
+    }
+
+    return {
+      ok: false,
+      status: 400,
+      message: "Client email is required before sending an alert.",
+      sentCount: 0,
+      matchCount: 0,
+      skipped: true,
+    };
+  }
+
+  if (client.alertUnsubscribedAt) {
+    if (!dryRun) {
+      await updateAlertTimestampsWithServiceRole(client, checkedAt);
+    }
+
+    return {
+      ok: false,
+      status: 409,
+      message:
+        "This client has unsubscribed from listing alerts. Re-enable alerts on the client record before sending.",
+      sentCount: 0,
+      matchCount: 0,
+      skipped: true,
+    };
+  }
+
+  const previouslySentListingIds =
+    await getSuccessfullySentListingIdsWithServiceRole(
+      client.id,
+      client.ownerId
+    );
+  const matches = getClientListingMatches(client, listings, {
+    alertOnly: true,
+    excludeListingIds: previouslySentListingIds,
+    limit: maxListingsPerEmail,
+  });
+
+  if (matches.length === 0) {
+    if (!dryRun) {
+      await updateAlertTimestampsWithServiceRole(client, checkedAt);
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      message: "No new matching listings found.",
+      sentCount: 0,
+      matchCount: 0,
+      skipped: true,
+    };
+  }
+
+  if (dryRun) {
+    return {
+      ok: true,
+      status: 200,
+      message: `Dry run found ${matches.length} matching listing${
+        matches.length === 1 ? "" : "s"
+      }.`,
+      sentCount: 0,
+      matchCount: matches.length,
+      skipped: false,
+      listingIds: matches.map((listing) => listing.id),
+    };
+  }
+
+  const batchId = randomUUID();
+
+  try {
+    const resendEmailId = await sendResendEmail({
+      client,
+      listings: matches,
+      sender,
+      siteUrl,
+      batchId,
+    });
+    const sentAt = new Date().toISOString();
+    const rows = await recordAlertSendRowsWithServiceRole({
+      client,
+      listings: matches,
+      ownerId: client.ownerId,
+      batchId,
+      status: "Sent",
+      resendEmailId,
+      sentAt,
+    });
+
+    await updateAlertTimestampsWithServiceRole(
+      client,
+      checkedAt,
+      sentAt,
+      matches.map((listing) => listing.id)
+    );
+
+    return {
+      ok: true,
+      status: 200,
+      message: `Sent ${matches.length} listing${
+        matches.length === 1 ? "" : "s"
+      } to ${client.email}.`,
+      sentCount: matches.length,
+      matchCount: matches.length,
+      skipped: false,
+      history: rows.map(toClientAlertSend),
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Listing alert email failed.";
+    const failedAt = new Date().toISOString();
+    const rows = await recordAlertSendRowsWithServiceRole({
+      client,
+      listings: matches,
+      ownerId: client.ownerId,
+      batchId,
+      status: "Failed",
+      errorMessage: message,
+      sentAt: failedAt,
+    });
+
+    await updateAlertTimestampsWithServiceRole(client, checkedAt);
+
+    return {
+      ok: false,
+      status: message.includes("limit") ? 429 : 502,
+      message,
+      sentCount: 0,
+      matchCount: matches.length,
+      skipped: false,
       history: rows.map(toClientAlertSend),
     };
   }

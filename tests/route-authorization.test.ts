@@ -14,7 +14,9 @@ const mocks = vi.hoisted(() => ({
   getAgentContactEmail: vi.fn(),
   getAppSession: vi.fn(),
   getListingsForViewer: vi.fn(),
+  runScheduledClientAlerts: vi.fn(),
   sendListingAlertNow: vi.fn(),
+  assertClientAlertRunSecret: vi.fn(),
   unsubscribeClientAlertByToken: vi.fn(),
   updateOwnProfile: vi.fn(),
   updateListing: vi.fn(),
@@ -69,6 +71,11 @@ vi.mock("@/lib/client-alerts", () => ({
   sendListingAlertNow: mocks.sendListingAlertNow,
 }));
 
+vi.mock("@/lib/client-alert-runner", () => ({
+  assertClientAlertRunSecret: mocks.assertClientAlertRunSecret,
+  runScheduledClientAlerts: mocks.runScheduledClientAlerts,
+}));
+
 vi.mock("@/lib/client-alert-preferences", () => ({
   unsubscribeClientAlertByToken: mocks.unsubscribeClientAlertByToken,
 }));
@@ -78,6 +85,7 @@ vi.mock("@/lib/profiles", () => ({
 }));
 
 import { PATCH as updateApproval } from "@/app/api/admin/listings/[id]/approval/route";
+import { POST as runClientAlerts } from "@/app/api/client-alerts/run/route";
 import { POST as sendClientAlert } from "@/app/api/client-alerts/send/route";
 import { POST as unsubscribeClientAlert } from "@/app/api/client-alerts/unsubscribe/route";
 import { POST as createAgentClient } from "@/app/api/clients/route";
@@ -324,6 +332,84 @@ describe("client alert unsubscribe route", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Alert preference link is invalid or expired.",
     });
+  });
+});
+
+describe("scheduled client alert run route", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.runScheduledClientAlerts.mockResolvedValue({
+      ok: true,
+      dryRun: true,
+      clientCount: 1,
+      processedCount: 1,
+      sentCount: 0,
+      matchCount: 1,
+      results: [],
+    });
+  });
+
+  it("requires the internal run secret", async () => {
+    mocks.assertClientAlertRunSecret.mockImplementation(() => {
+      throw new Error("Invalid client alert run secret.");
+    });
+
+    const response = await runClientAlerts(
+      new Request("http://localhost/api/client-alerts/run", {
+        method: "POST",
+        body: JSON.stringify({ dryRun: true }),
+      })
+    );
+
+    expect(response.status).toBe(401);
+    expect(mocks.runScheduledClientAlerts).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({
+      error: "Invalid client alert run secret.",
+    });
+  });
+
+  it("defaults scheduled alert runs to dry-run mode", async () => {
+    const response = await runClientAlerts(
+      new Request("http://localhost/api/client-alerts/run", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer run-secret",
+        },
+        body: JSON.stringify({ limit: 2 }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.assertClientAlertRunSecret).toHaveBeenCalledWith(
+      "run-secret"
+    );
+    expect(mocks.runScheduledClientAlerts).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dryRun: true,
+        limit: 2,
+        siteUrl: "http://localhost",
+      })
+    );
+  });
+
+  it("allows explicit non-dry-run batches", async () => {
+    const response = await runClientAlerts(
+      new Request("http://localhost/api/client-alerts/run", {
+        method: "POST",
+        headers: {
+          "x-client-alert-run-secret": "run-secret",
+        },
+        body: JSON.stringify({ dryRun: false, limit: 3 }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.runScheduledClientAlerts).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dryRun: false,
+        limit: 3,
+      })
+    );
   });
 });
 

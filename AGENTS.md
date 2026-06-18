@@ -149,6 +149,8 @@ Set these locally in `.env.local` and in Vercel project settings:
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
+# Required for internal scheduled listing-alert runner calls.
+CLIENT_ALERT_RUN_SECRET=GENERATE_A_LONG_RANDOM_SECRET
 # Optional: explicitly enable mock read fallback in a demo deployment.
 ETHIOMLS_ENABLE_MOCK_LISTINGS=true
 ```
@@ -926,6 +928,33 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
     - Add a cron-safe dry-run/batched alert runner route that respects
       `alert_enabled`, `alert_frequency`, `alert_consent_at`,
       `alert_unsubscribed_at`, rate caps, and existing send history.
+- Latest scheduled-alert runner slice:
+  - Added internal runner route:
+    - `POST /api/client-alerts/run`
+    - Protected by `CLIENT_ALERT_RUN_SECRET` via `Authorization: Bearer ...`
+      or `x-client-alert-run-secret`.
+    - Defaults to `dryRun: true`; explicit `{ "dryRun": false }` is required
+      to send.
+    - Batch limit defaults to 5 and is capped at 10.
+  - Added service-role scheduled alert helpers:
+    - `getScheduledAlertClients()`
+    - `getAlertListingsForAutomation()`
+    - `getAlertSenderProfile()`
+    - `sendScheduledListingAlert()`
+    - `runScheduledClientAlerts()`
+  - Runner respects `alert_enabled`, `alert_frequency`, `alert_consent_at`,
+    `alert_unsubscribed_at`, already-sent listing history, and no-match
+    handling.
+  - Frequency behavior:
+    - `Off`: skipped.
+    - `Immediate`: due whenever unsent matches exist.
+    - `Daily`: due when last checked/sent is at least 24 hours old.
+    - `Weekly`: due when last checked/sent is at least 7 days old.
+  - Scheduled sends use the agent profile as sender identity and include the
+    existing alert unsubscribe link.
+  - Vercel Cron is not configured yet. First production use should call the
+    route with `dryRun: true`, inspect results, then enable non-dry-run with a
+    small limit.
   - Recommended checkpoint commit message:
     `Harden showing requests and add public agent contact email`
 - Previous implemented slice: manual agent-side client listing alert emails and

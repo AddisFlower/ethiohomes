@@ -4,11 +4,13 @@ import { createListingFixture } from "@/tests/fixtures/listings";
 
 const mocks = vi.hoisted(() => ({
   authenticatedSupabaseRequest: vi.fn(),
+  serviceRoleSupabaseRequest: vi.fn(),
   getAgentClientById: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", () => ({
   authenticatedSupabaseRequest: mocks.authenticatedSupabaseRequest,
+  serviceRoleSupabaseRequest: mocks.serviceRoleSupabaseRequest,
 }));
 
 vi.mock("@/lib/clients", async () => {
@@ -22,7 +24,10 @@ vi.mock("@/lib/clients", async () => {
   };
 });
 
-import { sendListingAlertNow } from "@/lib/client-alerts";
+import {
+  sendListingAlertNow,
+  sendScheduledListingAlert,
+} from "@/lib/client-alerts";
 import type { AgentClient } from "@/lib/clients";
 
 const client: AgentClient = {
@@ -98,6 +103,33 @@ describe("client listing alerts", () => {
     process.env.LISTING_ALERT_PRODUCT_NAME = "EthioMLS";
     mocks.getAgentClientById.mockResolvedValue(client);
     mockSupabaseDefaults();
+    mocks.serviceRoleSupabaseRequest.mockImplementation((path: string) => {
+      if (path.includes("/client_alert_sends?select=listing_id")) {
+        return Promise.resolve([]);
+      }
+
+      if (path === "/client_alert_sends") {
+        return Promise.resolve([
+          {
+            id: "history-1",
+            send_batch_id: "batch-1",
+            agent_client_id: client.id,
+            agent_owner_id: agentSession.user.id,
+            listing_id: "listing-1",
+            listing_title: "Bole Apartment",
+            listing_mls_id: "MLS-2001",
+            recipient_email: client.email,
+            status: "Sent",
+            resend_email_id: "email-1",
+            error_message: null,
+            sent_at: "2026-06-17T12:00:00.000Z",
+            created_at: "2026-06-17T12:00:00.000Z",
+          },
+        ]);
+      }
+
+      return Promise.resolve(undefined);
+    });
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ id: "email-1" }),
@@ -365,5 +397,81 @@ describe("client listing alerts", () => {
       "This client has unsubscribed from listing alerts. Re-enable alerts on the client record before sending."
     );
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("dry-runs scheduled alerts without sending or writing history", async () => {
+    const result = await sendScheduledListingAlert({
+      client: {
+        ...client,
+        alertEnabled: true,
+        alertConsentAt: "2026-06-15T12:00:00.000Z",
+      },
+      dryRun: true,
+      listings: [
+        createListingFixture({
+          id: "listing-1",
+          title: "Bole Apartment",
+          location: "Addis Ababa, Bole",
+          propertyType: "Apartment",
+          transactionType: "For Sale",
+        }),
+      ],
+      sender: {
+        email: "agent-public@example.com",
+        fullName: "Agent Example",
+        agencyName: "Example Realty",
+      },
+      siteUrl: "https://ethiomls.example",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: true,
+        sentCount: 0,
+        matchCount: 1,
+        skipped: false,
+      })
+    );
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(mocks.serviceRoleSupabaseRequest).not.toHaveBeenCalledWith(
+      "/client_alert_sends",
+      expect.anything()
+    );
+  });
+
+  it("sends scheduled alerts with service-role history writes", async () => {
+    const result = await sendScheduledListingAlert({
+      client: {
+        ...client,
+        alertEnabled: true,
+        alertConsentAt: "2026-06-15T12:00:00.000Z",
+      },
+      dryRun: false,
+      listings: [
+        createListingFixture({
+          id: "listing-1",
+          title: "Bole Apartment",
+          location: "Addis Ababa, Bole",
+          propertyType: "Apartment",
+          transactionType: "For Sale",
+        }),
+      ],
+      sender: {
+        email: "agent-public@example.com",
+        fullName: "Agent Example",
+        agencyName: "Example Realty",
+      },
+      siteUrl: "https://ethiomls.example",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.sentCount).toBe(1);
+    expect(global.fetch).toHaveBeenCalled();
+    expect(mocks.serviceRoleSupabaseRequest).toHaveBeenCalledWith(
+      "/client_alert_sends",
+      expect.objectContaining({
+        method: "POST",
+      })
+    );
   });
 });

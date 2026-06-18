@@ -216,6 +216,23 @@ Use a non-owner visitor or agent for each test.
 13. Expected: sending is blocked until the agent re-enables alerts on the
     client record.
 
+## Scheduled Listing Alert Runner
+
+1. Set `CLIENT_ALERT_RUN_SECRET` locally and in Vercel.
+2. Ensure at least one client has alerts enabled, consent recorded, a valid
+   email, and unsent matching listings.
+3. Call `POST /api/client-alerts/run` with
+   `Authorization: Bearer CLIENT_ALERT_RUN_SECRET` and body
+   `{ "dryRun": true, "limit": 2 }`.
+4. Expected: the response lists candidate clients and match counts without
+   sending email or writing alert history.
+5. Call the same route with `{ "dryRun": false, "limit": 1 }` using a
+   tester-controlled client email only.
+6. Expected: at most one client receives an alert email, send history is
+   recorded, and matching listings are not resent on the next dry run.
+7. Confirm unsubscribed clients, Off-frequency clients, and recently checked
+   Daily/Weekly clients are skipped.
+
 ## Public Lead Form Abuse Controls
 
 1. Submit a normal showing request for an Approved + Active listing.
