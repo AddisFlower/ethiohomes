@@ -330,7 +330,7 @@ export default function ClientForm({
 
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <h2 className="mb-4 text-xl font-bold text-black">
-            Automated Alert Prep
+            Listing Alerts
           </h2>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -343,7 +343,7 @@ export default function ClientForm({
                 }
                 className="h-5 w-5"
               />
-              Enable saved alert criteria
+              Enable listing alerts for this client
             </label>
 
             <div>
@@ -365,6 +365,12 @@ export default function ClientForm({
               </select>
             </div>
           </div>
+
+          <p className="mt-4 text-sm text-gray-600">
+            Enable alerts only for clients who have agreed to receive listing
+            updates. They can turn off alert emails from the preference link in
+            each message.
+          </p>
         </div>
 
         <button

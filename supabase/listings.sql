@@ -74,6 +74,9 @@ create table if not exists public.agent_clients (
   alert_last_checked_at timestamptz,
   alert_last_sent_at timestamptz,
   alert_matched_listing_ids text[] not null default '{}',
+  alert_consent_at timestamptz,
+  alert_unsubscribed_at timestamptz,
+  alert_unsubscribe_token text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (id, owner_id)
@@ -278,6 +281,24 @@ add column if not exists alert_market_statuses text[] not null default array['Ac
 alter table public.agent_clients
 add column if not exists alert_last_checked_at timestamptz;
 
+alter table public.agent_clients
+add column if not exists alert_consent_at timestamptz;
+
+alter table public.agent_clients
+add column if not exists alert_unsubscribed_at timestamptz;
+
+alter table public.agent_clients
+add column if not exists alert_unsubscribe_token text;
+
+update public.agent_clients
+set alert_unsubscribe_token = md5(random()::text || clock_timestamp()::text)
+where alert_unsubscribe_token is null;
+
+update public.agent_clients
+set alert_consent_at = coalesce(updated_at, created_at, now())
+where alert_enabled = true
+  and alert_consent_at is null;
+
 update public.agent_clients
 set alert_frequency = 'Off'
 where alert_frequency is null
@@ -299,6 +320,31 @@ begin
     alter table public.agent_clients
     add constraint agent_clients_alert_frequency_check
     check (alert_frequency in ('Off', 'Immediate', 'Daily', 'Weekly'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'agent_clients_alert_unsubscribe_token_unique'
+      and conrelid = 'public.agent_clients'::regclass
+  ) then
+    alter table public.agent_clients
+    add constraint agent_clients_alert_unsubscribe_token_unique
+    unique (alert_unsubscribe_token);
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'agent_clients_alert_consent_check'
+      and conrelid = 'public.agent_clients'::regclass
+  ) then
+    alter table public.agent_clients
+    add constraint agent_clients_alert_consent_check
+    check (
+      alert_enabled = false
+      or alert_consent_at is not null
+    );
   end if;
 
   if not exists (

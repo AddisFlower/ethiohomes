@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   getAppSession: vi.fn(),
   getListingsForViewer: vi.fn(),
   sendListingAlertNow: vi.fn(),
+  unsubscribeClientAlertByToken: vi.fn(),
   updateOwnProfile: vi.fn(),
   updateListing: vi.fn(),
   updateListingApproval: vi.fn(),
@@ -68,12 +69,17 @@ vi.mock("@/lib/client-alerts", () => ({
   sendListingAlertNow: mocks.sendListingAlertNow,
 }));
 
+vi.mock("@/lib/client-alert-preferences", () => ({
+  unsubscribeClientAlertByToken: mocks.unsubscribeClientAlertByToken,
+}));
+
 vi.mock("@/lib/profiles", () => ({
   updateOwnProfile: mocks.updateOwnProfile,
 }));
 
 import { PATCH as updateApproval } from "@/app/api/admin/listings/[id]/approval/route";
 import { POST as sendClientAlert } from "@/app/api/client-alerts/send/route";
+import { POST as unsubscribeClientAlert } from "@/app/api/client-alerts/unsubscribe/route";
 import { POST as createAgentClient } from "@/app/api/clients/route";
 import {
   DELETE as deleteAgentClient,
@@ -266,6 +272,57 @@ describe("profile update route", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       error: "Public contact email must be a valid email address.",
+    });
+  });
+});
+
+describe("client alert unsubscribe route", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("allows public unsubscribe by token", async () => {
+    mocks.unsubscribeClientAlertByToken.mockResolvedValue({
+      clientId: "client-1",
+      email: "client@example.com",
+      unsubscribedAt: "2026-06-18T12:00:00.000Z",
+    });
+
+    const response = await unsubscribeClientAlert(
+      new Request("http://localhost/api/client-alerts/unsubscribe", {
+        method: "POST",
+        body: JSON.stringify({ token: "token-1" }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.getAppSession).not.toHaveBeenCalled();
+    expect(mocks.unsubscribeClientAlertByToken).toHaveBeenCalledWith(
+      "token-1"
+    );
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      result: expect.objectContaining({
+        clientId: "client-1",
+      }),
+    });
+  });
+
+  it("returns token validation errors from unsubscribe helper", async () => {
+    mocks.unsubscribeClientAlertByToken.mockRejectedValue(
+      new Error("Alert preference link is invalid or expired.")
+    );
+
+    const response = await unsubscribeClientAlert(
+      new Request("http://localhost/api/client-alerts/unsubscribe", {
+        method: "POST",
+        body: JSON.stringify({ token: "bad-token" }),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Alert preference link is invalid or expired.",
     });
   });
 });

@@ -41,6 +41,9 @@ const clientRow = {
   alert_last_checked_at: null,
   alert_last_sent_at: null,
   alert_matched_listing_ids: [],
+  alert_consent_at: "2026-06-15T12:00:00.000Z",
+  alert_unsubscribed_at: null,
+  alert_unsubscribe_token: "unsubscribe-token-1",
   created_at: "2026-06-15T12:00:00.000Z",
   updated_at: "2026-06-15T12:00:00.000Z",
 };
@@ -61,6 +64,9 @@ describe("agent clients", () => {
         id: "client-1",
         ownerId: authUser.id,
         alertEnabled: true,
+        alertConsentAt: "2026-06-15T12:00:00.000Z",
+        alertUnsubscribedAt: null,
+        alertUnsubscribeToken: "unsubscribe-token-1",
       })
     );
     expect(mocks.authenticatedSupabaseRequest).toHaveBeenCalledWith(
@@ -106,6 +112,11 @@ describe("agent clients", () => {
         body: expect.stringContaining(`"owner_id":"${authUser.id}"`),
       })
     );
+    const init = mocks.authenticatedSupabaseRequest.mock.calls[0][2] as RequestInit;
+    const body = JSON.parse(String(init.body));
+    expect(body.alert_unsubscribe_token).toEqual(expect.any(String));
+    expect(body.alert_consent_at).toEqual(expect.any(String));
+    expect(body.alert_unsubscribed_at).toBeNull();
   });
 
   it("rejects invalid client email", async () => {
@@ -200,6 +211,9 @@ describe("agent clients", () => {
         alertLastCheckedAt: client.alert_last_checked_at,
         alertLastSentAt: client.alert_last_sent_at,
         alertMatchedListingIds: [],
+        alertConsentAt: client.alert_consent_at,
+        alertUnsubscribedAt: client.alert_unsubscribed_at,
+        alertUnsubscribeToken: client.alert_unsubscribe_token,
         createdAt: client.created_at,
         updatedAt: client.updated_at,
       },

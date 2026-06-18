@@ -153,6 +153,19 @@ describe("RLS policy migration contract", () => {
     );
   });
 
+  it("prepares durable client alert preference fields", () => {
+    expect(schema).toContain("alert_consent_at timestamptz");
+    expect(schema).toContain("alert_unsubscribed_at timestamptz");
+    expect(schema).toContain("alert_unsubscribe_token text");
+    expect(schema).toContain(
+      "agent_clients_alert_unsubscribe_token_unique"
+    );
+    expect(schema).toContain(
+      "where alert_enabled = true\n  and alert_consent_at is null"
+    );
+    expect(schema).toContain("agent_clients_alert_consent_check");
+  });
+
   it("limits listing image uploads to authenticated users' own storage folder", () => {
     expect(policies).toMatch(
       /policy listing_images_select_public[\s\S]*on storage\.objects[\s\S]*bucket_id = 'listing-images'/i

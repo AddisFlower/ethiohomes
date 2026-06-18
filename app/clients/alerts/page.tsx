@@ -178,6 +178,11 @@ export default async function ClientAlertsPage() {
                           <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
                             {client.alertEnabled ? "Enabled" : "Disabled"}
                           </span>
+                          {client.alertUnsubscribedAt && (
+                            <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                              Unsubscribed
+                            </span>
+                          )}
                           <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
                             {client.alertFrequency}
                           </span>
@@ -189,6 +194,19 @@ export default async function ClientAlertsPage() {
                         <p className="mt-2 text-sm text-gray-500">
                           Alert markets: {client.alertMarketStatuses.join(", ")}
                         </p>
+                        {client.alertUnsubscribedAt && (
+                          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                            <p className="font-semibold">
+                              Client unsubscribed from listing alerts.
+                            </p>
+                            <p className="mt-1">
+                              Alerts were turned off on{" "}
+                              {formatDate(client.alertUnsubscribedAt)}.
+                              Re-enable alerts from the client edit page only
+                              with the client&apos;s consent.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="w-full lg:w-64">

@@ -42,6 +42,9 @@ export type AgentClient = {
   alertLastCheckedAt: string | null;
   alertLastSentAt: string | null;
   alertMatchedListingIds: string[];
+  alertConsentAt: string | null;
+  alertUnsubscribedAt: string | null;
+  alertUnsubscribeToken: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -73,6 +76,9 @@ type AgentClientRow = {
   alert_last_checked_at?: string | null;
   alert_last_sent_at: string | null;
   alert_matched_listing_ids: string[] | null;
+  alert_consent_at?: string | null;
+  alert_unsubscribed_at?: string | null;
+  alert_unsubscribe_token?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -129,6 +135,9 @@ function toAgentClient(row: AgentClientRow): AgentClient {
     alertLastCheckedAt: row.alert_last_checked_at ?? null,
     alertLastSentAt: row.alert_last_sent_at,
     alertMatchedListingIds: row.alert_matched_listing_ids ?? [],
+    alertConsentAt: row.alert_consent_at ?? null,
+    alertUnsubscribedAt: row.alert_unsubscribed_at ?? null,
+    alertUnsubscribeToken: row.alert_unsubscribe_token ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -224,6 +233,8 @@ function fromFormData(formData: FormData, ownerId: string) {
     throw new Error("Minimum price cannot be greater than maximum price.");
   }
 
+  const alertEnabled = formData.get("alertEnabled") === "on";
+
   return {
     owner_id: ownerId,
     name: getText(formData, "name", "Client name"),
@@ -255,12 +266,14 @@ function fromFormData(formData: FormData, ownerId: string) {
       "minBathrooms",
       "Minimum bathrooms"
     ),
-    alert_enabled: formData.get("alertEnabled") === "on",
+    alert_enabled: alertEnabled,
     alert_frequency: alertFrequency,
     alert_market_statuses:
       selectedAlertMarketStatuses.length > 0
         ? selectedAlertMarketStatuses
         : ["Active"],
+    alert_consent_at: alertEnabled ? new Date().toISOString() : null,
+    alert_unsubscribed_at: null,
   };
 }
 
@@ -323,6 +336,7 @@ export async function createAgentClient(
 ) {
   const body = {
     id: randomUUID(),
+    alert_unsubscribe_token: randomUUID(),
     ...fromFormData(formData, ownerId),
   };
 

@@ -86,6 +86,14 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Showing Requests can prefill a new client record through Add to Clients.
 - Manual client listing alert emails are implemented through Resend; scheduled
   automated alert sending is not enabled yet.
+- Listing alert preference groundwork is implemented:
+  - `agent_clients.alert_consent_at`
+  - `agent_clients.alert_unsubscribed_at`
+  - `agent_clients.alert_unsubscribe_token`
+  - `/alerts/unsubscribe`
+  - `POST /api/client-alerts/unsubscribe`
+  Manual alert emails include a preference link when a token exists, and sends
+  are blocked for unsubscribed clients until the agent re-enables alerts.
 - Showing requests are limited to Approved + Active listings in both UI and server logic.
 - Residential room fields are required; Land stores null rooms; Commercial/Office use optional bathrooms and null bedrooms.
 - Add Listing excludes Pending and Closed; Edit Listing supports the full market lifecycle.
@@ -815,10 +823,8 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
       bedrooms/bathrooms when applicable, and direct `View Details` links.
     - Signature should include agent name, agency name if available, and
       `via ${LISTING_ALERT_PRODUCT_NAME}`.
-    - For the first manual-send listing alert email, include a lightweight
-      preference sentence asking the client to reply if they no longer want
-      listing updates. TODO: add a real unsubscribe/preference-management
-      option before scheduled or automatic client alert emails are enabled.
+    - Include a preference link for clients to stop listing updates when an
+      unsubscribe token exists.
   - Phase 6 - Agent UI:
     - `/clients/alerts` is the main alert workspace.
     - `/clients/[id]` should also show a smaller alert panel.
@@ -890,6 +896,36 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
   - Quick security pass found and fixed an RLS grant issue where owner profile
     updates were initially table-wide; `tests/rls-policies.test.ts` now asserts
     the column-limited grant.
+- Latest automation-prep slice:
+  - Added durable alert consent/unsubscribe fields to `agent_clients`.
+  - New clients receive an `alert_unsubscribe_token`; existing rows are
+    backfilled by `supabase/listings.sql`.
+  - Enabling alerts records `alert_consent_at`; disabling alerts clears
+    consent for the current saved state.
+  - Manual alert emails now include `/alerts/unsubscribe?token=...` when a
+    token is available.
+  - Public unsubscribe route:
+    - `POST /api/client-alerts/unsubscribe`
+    - Uses the opaque token and service-role REST to set
+      `alert_enabled = false`, `alert_frequency = Off`, and
+      `alert_unsubscribed_at = now`.
+  - Public unsubscribe page:
+    - `/alerts/unsubscribe`
+    - Requires the email token and asks the recipient to confirm before
+      turning alerts off.
+  - Manual sends now block clients with `alert_unsubscribed_at` until the agent
+    re-enables alerts on the client record.
+  - Agent-facing UI now clearly marks unsubscribed clients on `/clients`,
+    `/clients/[id]`, and `/clients/alerts`, including the unsubscribe date on
+    detail and alert-workspace warning states.
+  - Scheduled/cron automation is still not implemented.
+  - Local verification after this slice:
+    - `npm.cmd run lint`
+    - `npm.cmd run test -- --configLoader runner` with 113 tests
+  - Recommended next implementation slice:
+    - Add a cron-safe dry-run/batched alert runner route that respects
+      `alert_enabled`, `alert_frequency`, `alert_consent_at`,
+      `alert_unsubscribed_at`, rate caps, and existing send history.
   - Recommended checkpoint commit message:
     `Harden showing requests and add public agent contact email`
 - Previous implemented slice: manual agent-side client listing alert emails and
@@ -936,10 +972,8 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
       alert emails.
     - Emails include up to 5 matching listings.
     - Each listing includes a direct `View Details` link.
-    - Email includes agent-style copy and a lightweight preference sentence
-      asking the client to reply if they no longer want listing updates.
-    - TODO: Add a real unsubscribe/preference-management flow before scheduled
-      or automatic alert emails are enabled.
+    - Email includes agent-style copy and, after the automation-prep slice, a
+      preference link for stopping listing updates when a token exists.
   - Important UX decision:
     - The old single client `preferred_market_status` filter was removed from
       the client form and ignored by matching.

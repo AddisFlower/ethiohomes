@@ -49,6 +49,9 @@ const client: AgentClient = {
   alertLastCheckedAt: null,
   alertLastSentAt: null,
   alertMatchedListingIds: [],
+  alertConsentAt: null,
+  alertUnsubscribedAt: null,
+  alertUnsubscribeToken: "unsubscribe-token-1",
   createdAt: "2026-06-15T12:00:00.000Z",
   updatedAt: "2026-06-15T12:00:00.000Z",
 };
@@ -128,6 +131,10 @@ describe("client listing alerts", () => {
       expect.objectContaining({
         method: "POST",
       })
+    );
+    const resendInit = vi.mocked(global.fetch).mock.calls[0][1] as RequestInit;
+    expect(String(resendInit.body)).toContain(
+      "/alerts/unsubscribe?token=unsubscribe-token-1"
     );
     expect(mocks.authenticatedSupabaseRequest).toHaveBeenCalledWith(
       "/client_alert_sends",
@@ -329,5 +336,34 @@ describe("client listing alerts", () => {
         body: expect.stringContaining('"status":"Failed"'),
       })
     );
+  });
+
+  it("does not send to unsubscribed clients", async () => {
+    mocks.getAgentClientById.mockResolvedValue({
+      ...client,
+      alertUnsubscribedAt: "2026-06-17T12:00:00.000Z",
+    });
+
+    const result = await sendListingAlertNow({
+      clientId: client.id,
+      listings: [
+        createListingFixture({
+          id: "listing-1",
+          title: "Bole Apartment",
+          location: "Addis Ababa, Bole",
+          propertyType: "Apartment",
+          transactionType: "For Sale",
+        }),
+      ],
+      session: agentSession,
+      siteUrl: "https://ethiomls.example",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(409);
+    expect(result.message).toBe(
+      "This client has unsubscribed from listing alerts. Re-enable alerts on the client record before sending."
+    );
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

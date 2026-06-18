@@ -59,6 +59,9 @@ export default async function ClientsPage() {
     getDueFollowUps(session.user.id, session.accessToken),
   ]);
   const alertCount = clients.filter((client) => client.alertEnabled).length;
+  const unsubscribedCount = clients.filter(
+    (client) => client.alertUnsubscribedAt
+  ).length;
   const followUpCount = dueFollowUps.length;
   const activeClients = clients.filter(
     (client) => client.status !== "Closed" && client.status !== "Not Interested"
@@ -95,12 +98,13 @@ export default async function ClientsPage() {
           </div>
         </div>
 
-        <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+        <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-5">
           {[
             ["Total Clients", clients.length],
             ["Active Pipeline", activeClients],
             ["Due Follow-ups", followUpCount],
             ["Alerts Enabled", alertCount],
+            ["Unsubscribed", unsubscribedCount],
           ].map(([label, value]) => (
             <div
               key={label}
@@ -175,12 +179,18 @@ export default async function ClientsPage() {
                   <div>
                     <span
                       className={
-                        client.alertEnabled
+                        client.alertUnsubscribedAt
+                          ? "inline-flex rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700"
+                          : client.alertEnabled
                           ? "inline-flex rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-700"
                           : "inline-flex rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600"
                       }
                     >
-                      {client.alertEnabled ? "Enabled" : "Off"}
+                      {client.alertUnsubscribedAt
+                        ? "Unsubscribed"
+                        : client.alertEnabled
+                          ? "Enabled"
+                          : "Off"}
                     </span>
                     <p className="mt-2 text-sm text-gray-500">
                       {client.alertMarketStatuses.join(", ")}

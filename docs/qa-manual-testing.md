@@ -198,6 +198,24 @@ Use a non-owner visitor or agent for each test.
 27. Expected: admin access does not grant global access to other agents'
     clients.
 
+## Listing Alert Preference Links
+
+1. Create or edit a client and enable listing alerts.
+2. Send a manual listing alert to a tester-controlled email.
+3. Expected: the email includes a link to manage or stop listing updates.
+4. Open the link.
+5. Expected: `/alerts/unsubscribe` renders an alert preference page.
+6. Click Turn Off Listing Alerts.
+7. Expected: the page confirms listing alerts have been turned off.
+8. Open the client record as the owning agent.
+9. Expected: alerts are disabled, frequency is Off, and the client detail page
+   clearly shows that the client unsubscribed.
+10. Open `/clients` and `/clients/alerts`.
+11. Expected: the client is marked Unsubscribed in both places.
+12. Try sending another alert from `/clients/[id]`.
+13. Expected: sending is blocked until the agent re-enables alerts on the
+    client record.
+
 ## Public Lead Form Abuse Controls
 
 1. Submit a normal showing request for an Approved + Active listing.

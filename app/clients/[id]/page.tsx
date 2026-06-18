@@ -148,6 +148,11 @@ export default async function ClientDetailPage({
                     {client.alertFrequency} Alert Saved
                   </span>
                 )}
+                {client.alertUnsubscribedAt && (
+                  <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">
+                    Unsubscribed
+                  </span>
+                )}
               </div>
 
               <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
@@ -257,6 +262,19 @@ export default async function ClientDetailPage({
 
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-blue-900">
               <h2 className="mb-2 text-xl font-bold">Listing Alert</h2>
+              {client.alertUnsubscribedAt && (
+                <div className="mt-4 rounded-lg border border-red-200 bg-white p-4 text-red-800">
+                  <p className="font-semibold">
+                    Client unsubscribed from listing alerts.
+                  </p>
+                  <p className="mt-1 text-sm">
+                    Alerts were turned off on{" "}
+                    {formatDate(client.alertUnsubscribedAt)}. Re-enable alerts
+                    from Edit Client only if this client agrees to receive
+                    listing updates again.
+                  </p>
+                </div>
+              )}
               <div className="mt-4">
                 <AlertSendButton
                   clientId={client.id}

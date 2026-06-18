@@ -148,6 +148,19 @@ function buildListingUrl(siteUrl: string, listing: Property) {
   )}`;
 }
 
+function buildUnsubscribeUrl(siteUrl: string, client: AgentClient) {
+  if (!client.alertUnsubscribeToken) {
+    return null;
+  }
+
+  return `${siteUrl.replace(
+    /\/$/,
+    ""
+  )}/alerts/unsubscribe?token=${encodeURIComponent(
+    client.alertUnsubscribeToken
+  )}`;
+}
+
 function buildSubject(client: AgentClient, listings: Property[]) {
   const location = client.preferredLocation?.trim();
 
@@ -176,6 +189,7 @@ function buildEmailContent(
   const agentName = getAgentName(session);
   const agencyName = session.profile.agency_name?.trim();
   const productName = getProductName();
+  const unsubscribeUrl = buildUnsubscribeUrl(siteUrl, client);
   const listingLines = listings
     .map((listing, index) => {
       const url = buildListingUrl(siteUrl, listing);
@@ -228,14 +242,24 @@ I found a few listings that match what you are looking for.
 
 ${listingLines}
 
-Reply to this email if you no longer want listing updates from me.
+${
+      unsubscribeUrl
+        ? `Manage or stop these listing updates: ${unsubscribeUrl}`
+        : "Reply to this email if you no longer want listing updates from me."
+    }
 
 ${signature}`,
     html: `<div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:640px;">
       <p>Hi ${escapeHtml(client.name)},</p>
       <p>I found a few listings that match what you are looking for.</p>
       ${htmlListings}
-      <p style="color:#4b5563;">Reply to this email if you no longer want listing updates from me.</p>
+      ${
+        unsubscribeUrl
+          ? `<p style="color:#4b5563;"><a href="${escapeHtml(
+              unsubscribeUrl
+            )}" style="color:#047857;">Manage or stop these listing updates</a>.</p>`
+          : `<p style="color:#4b5563;">Reply to this email if you no longer want listing updates from me.</p>`
+      }
       <p>${escapeHtml(signature)}</p>
     </div>`,
   };
@@ -494,6 +518,17 @@ export async function sendListingAlertNow({
       ok: false,
       status: 400,
       message: "Client email is required before sending an alert.",
+      sentCount: 0,
+    };
+  }
+
+  if (client.alertUnsubscribedAt) {
+    await updateAlertTimestamps(client, session.accessToken, checkedAt);
+    return {
+      ok: false,
+      status: 409,
+      message:
+        "This client has unsubscribed from listing alerts. Re-enable alerts on the client record before sending.",
       sentCount: 0,
     };
   }
