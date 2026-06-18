@@ -46,6 +46,9 @@ export type AgentClient = {
   updatedAt: string;
 };
 
+export const clientNotFoundOrDeniedMessage =
+  "Client not found or access denied.";
+
 type AgentClientRow = {
   id: string;
   owner_id: string;
@@ -239,10 +242,7 @@ function fromFormData(formData: FormData, ownerId: string) {
       formData,
       "preferredTransactionType"
     ),
-    preferred_market_status: getOptionalText(
-      formData,
-      "preferredMarketStatus"
-    ),
+    preferred_market_status: null,
     min_price: minPrice,
     max_price: maxPrice,
     min_bedrooms: getOptionalNumber(
@@ -369,6 +369,33 @@ export async function updateAgentClient(
   return toAgentClient(rows[0]);
 }
 
+export async function deleteAgentClient(
+  id: string,
+  ownerId: string,
+  accessToken: string
+) {
+  const rows = await authenticatedSupabaseRequest<
+    Pick<AgentClientRow, "id" | "owner_id">[]
+  >(
+    `/agent_clients?id=eq.${encodeURIComponent(
+      id
+    )}&owner_id=eq.${encodeURIComponent(ownerId)}`,
+    accessToken,
+    {
+      method: "DELETE",
+      headers: {
+        Prefer: "return=representation",
+      },
+    }
+  );
+
+  if (!rows[0]) {
+    throw new Error(clientNotFoundOrDeniedMessage);
+  }
+
+  return rows[0];
+}
+
 function parsePrice(value: string) {
   const number = Number(value.replace(/[^0-9]/g, ""));
   return Number.isFinite(number) ? number : null;
@@ -431,13 +458,6 @@ export function getClientListingMatches(
       return false;
     }
 
-    if (
-      client.preferredMarketStatus &&
-      listing.marketStatus !== client.preferredMarketStatus
-    ) {
-      return false;
-    }
-
     if (price !== null && client.minPrice !== null && price < client.minPrice) {
       return false;
     }
@@ -466,4 +486,76 @@ export function getClientListingMatches(
   return typeof options.limit === "number"
     ? matches.slice(0, options.limit)
     : matches;
+}
+
+export function getClientAlertMatchDiagnostics(
+  client: AgentClient,
+  listings: Property[],
+  excludeListingIds: string[] = []
+) {
+  const approvedListings = listings.filter(
+    (listing) => listing.approvalStatus === "Approved"
+  );
+  const alertMarketListings = approvedListings.filter(
+    (listing) =>
+      alertMarketStatuses.includes(listing.marketStatus as AlertMarketStatus) &&
+      client.alertMarketStatuses.includes(
+        listing.marketStatus as AlertMarketStatus
+      )
+  );
+  const eligibleMatches = getClientListingMatches(client, listings, {
+    alertOnly: true,
+  });
+  const unsentMatches = getClientListingMatches(client, listings, {
+    alertOnly: true,
+    excludeListingIds,
+    limit: 5,
+  });
+
+  return {
+    visibleListingCount: listings.length,
+    approvedListingCount: approvedListings.length,
+    alertMarketListingCount: alertMarketListings.length,
+    eligibleMatchCount: eligibleMatches.length,
+    unsentMatchCount: unsentMatches.length,
+    previouslySentCount: excludeListingIds.length,
+  };
+}
+
+export function getClientAlertExclusionReasons(
+  client: AgentClient,
+  listing: Property,
+  excludeListingIds: string[] = []
+) {
+  const reasons: string[] = [];
+
+  if (listing.approvalStatus !== "Approved") {
+    reasons.push(`Approval is ${listing.approvalStatus}`);
+  }
+
+  if (
+    !alertMarketStatuses.includes(listing.marketStatus as AlertMarketStatus)
+  ) {
+    reasons.push(`${listing.marketStatus} is not alert-eligible`);
+  } else if (
+    !client.alertMarketStatuses.includes(
+      listing.marketStatus as AlertMarketStatus
+    )
+  ) {
+    reasons.push(`${listing.marketStatus} is not selected for alerts`);
+  }
+
+  if (excludeListingIds.includes(listing.id)) {
+    reasons.push("Already sent to this client");
+  }
+
+  const criteriaMatch = getClientListingMatches(client, [listing], {
+    alertOnly: false,
+  }).length;
+
+  if (criteriaMatch === 0) {
+    reasons.push("Does not match saved criteria");
+  }
+
+  return reasons;
 }

@@ -168,6 +168,133 @@ describe("client listing alerts", () => {
 
     expect(result.ok).toBe(true);
     expect(result.sentCount).toBe(0);
+    expect(result.message).toBe(
+      "All matching listings were already sent to this client. Use Resend matches to send them again."
+    );
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("can intentionally resend previously sent matching listings", async () => {
+    mocks.authenticatedSupabaseRequest.mockImplementation((path: string) => {
+      if (path.includes("/client_alert_sends?select=*&")) {
+        return Promise.resolve([]);
+      }
+
+      if (path.includes("/client_alert_sends?select=listing_id")) {
+        return Promise.resolve([{ listing_id: "listing-1" }]);
+      }
+
+      if (path === "/client_alert_sends") {
+        return Promise.resolve([
+          {
+            id: "history-2",
+            send_batch_id: "batch-2",
+            agent_client_id: client.id,
+            agent_owner_id: agentSession.user.id,
+            listing_id: "listing-1",
+            listing_title: "Bole Apartment",
+            listing_mls_id: "MLS-2001",
+            recipient_email: client.email,
+            status: "Sent",
+            resend_email_id: "email-2",
+            error_message: null,
+            sent_at: "2026-06-17T12:05:00.000Z",
+            created_at: "2026-06-17T12:05:00.000Z",
+          },
+        ]);
+      }
+
+      return Promise.resolve(undefined);
+    });
+
+    const result = await sendListingAlertNow({
+      clientId: client.id,
+      includePreviouslySent: true,
+      listings: [
+        createListingFixture({
+          id: "listing-1",
+          title: "Bole Apartment",
+          location: "Addis Ababa, Bole",
+          propertyType: "Apartment",
+          transactionType: "For Sale",
+        }),
+      ],
+      session: agentSession,
+      siteUrl: "https://ethiomls.example",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.sentCount).toBe(1);
+    expect(global.fetch).toHaveBeenCalled();
+  });
+
+  it("sends the exact previewed unsent listing when preview IDs are provided", async () => {
+    const result = await sendListingAlertNow({
+      clientId: client.id,
+      previewListingIds: ["listing-2"],
+      listings: [
+        createListingFixture({
+          id: "listing-1",
+          title: "Older Bole Apartment",
+          location: "Addis Ababa, Bole",
+          propertyType: "Apartment",
+          transactionType: "For Sale",
+        }),
+        createListingFixture({
+          id: "listing-2",
+          title: "New Bole Apartment",
+          location: "Addis Ababa, Bole",
+          propertyType: "Apartment",
+          transactionType: "For Sale",
+        }),
+      ],
+      session: agentSession,
+      siteUrl: "https://ethiomls.example",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.sentCount).toBe(1);
+    expect(mocks.authenticatedSupabaseRequest).toHaveBeenCalledWith(
+      "/client_alert_sends",
+      agentSession.accessToken,
+      expect.objectContaining({
+        body: expect.stringContaining('"listing_id":"listing-2"'),
+      })
+    );
+  });
+
+  it("returns diagnostics when previewed listings are not visible to the send route", async () => {
+    const result = await sendListingAlertNow({
+      clientId: client.id,
+      previewListingIds: ["listing-2"],
+      listings: [
+        createListingFixture({
+          id: "listing-1",
+          title: "Older Bole Apartment",
+          location: "Addis Ababa, Bole",
+          propertyType: "Apartment",
+          transactionType: "For Sale",
+        }),
+      ],
+      session: agentSession,
+      siteUrl: "https://ethiomls.example",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.sentCount).toBe(0);
+    expect(result.message).toBe(
+      "The previewed listing is no longer visible to this session. Refresh alerts and try again."
+    );
+    expect(result.diagnostics).toEqual(
+      expect.objectContaining({
+        previewListingCount: 1,
+        serverVisibleListingCount: 1,
+        scopedListingCount: 0,
+        approvedListingCount: 0,
+        alertMarketListingCount: 0,
+        unsentMatchCount: 0,
+      })
+    );
     expect(global.fetch).not.toHaveBeenCalled();
   });
 

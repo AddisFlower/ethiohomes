@@ -27,8 +27,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const { clientId } = (await request.json().catch(() => ({}))) as {
+    const { clientId, includePreviouslySent, previewListingIds } = (await request
+      .json()
+      .catch(() => ({}))) as {
       clientId?: string;
+      includePreviouslySent?: boolean;
+      previewListingIds?: string[];
     };
 
     if (!clientId) {
@@ -45,7 +49,11 @@ export async function POST(request: Request) {
     );
     const result = await sendListingAlertNow({
       clientId,
+      includePreviouslySent: includePreviouslySent === true,
       listings,
+      previewListingIds: Array.isArray(previewListingIds)
+        ? previewListingIds.filter((id) => typeof id === "string")
+        : undefined,
       session: agentSession,
       siteUrl: getSiteUrl(request),
     });

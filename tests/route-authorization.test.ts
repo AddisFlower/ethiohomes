@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   createAgentClient: vi.fn(),
   createShowingRequest: vi.fn(),
   deleteListing: vi.fn(),
+  deleteAgentClient: vi.fn(),
   getAgentContactEmail: vi.fn(),
   getAppSession: vi.fn(),
   getListingsForViewer: vi.fn(),
@@ -48,6 +49,8 @@ vi.mock("@/lib/showing-requests", () => ({
 
 vi.mock("@/lib/clients", () => ({
   createAgentClient: mocks.createAgentClient,
+  deleteAgentClient: mocks.deleteAgentClient,
+  clientNotFoundOrDeniedMessage: "Client not found or access denied.",
   updateAgentClient: mocks.updateAgentClient,
 }));
 
@@ -58,7 +61,10 @@ vi.mock("@/lib/client-alerts", () => ({
 import { PATCH as updateApproval } from "@/app/api/admin/listings/[id]/approval/route";
 import { POST as sendClientAlert } from "@/app/api/client-alerts/send/route";
 import { POST as createAgentClient } from "@/app/api/clients/route";
-import { PUT as updateAgentClient } from "@/app/api/clients/[id]/route";
+import {
+  DELETE as deleteAgentClient,
+  PUT as updateAgentClient,
+} from "@/app/api/clients/[id]/route";
 import { POST as createListing } from "@/app/api/listings/route";
 import {
   DELETE as deleteListing,
@@ -119,6 +125,14 @@ describe("protected listing route authorization", () => {
         ),
     ],
     [
+      "delete client",
+      () =>
+        deleteAgentClient(
+          new Request("http://localhost/api/clients/client-1"),
+          clientRouteContext
+        ),
+    ],
+    [
       "update",
       () =>
         updateListing(
@@ -166,6 +180,53 @@ describe("protected listing route authorization", () => {
       error: "Agent profile required.",
     });
     expect(mocks.updateListingApproval).not.toHaveBeenCalled();
+  });
+});
+
+describe("client DELETE route", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getAppSession.mockResolvedValue(agentSession);
+  });
+
+  it("returns success after the owner-scoped client helper succeeds", async () => {
+    mocks.deleteAgentClient.mockResolvedValue({
+      id: "client-1",
+      owner_id: agentSession.user.id,
+    });
+
+    const response = await deleteAgentClient(
+      new Request("http://localhost/api/clients/client-1", {
+        method: "DELETE",
+      }),
+      clientRouteContext
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
+    expect(mocks.deleteAgentClient).toHaveBeenCalledWith(
+      "client-1",
+      agentSession.user.id,
+      agentSession.accessToken
+    );
+  });
+
+  it("returns 404 when the client matches no owner-filtered row", async () => {
+    mocks.deleteAgentClient.mockRejectedValue(
+      new Error("Client not found or access denied.")
+    );
+
+    const response = await deleteAgentClient(
+      new Request("http://localhost/api/clients/client-1", {
+        method: "DELETE",
+      }),
+      clientRouteContext
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: "Client not found or access denied.",
+    });
   });
 });
 

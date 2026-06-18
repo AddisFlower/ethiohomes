@@ -7,12 +7,14 @@ import {
 } from "@/lib/auth";
 import {
   getAgentClientById,
+  getClientAlertMatchDiagnostics,
   getClientListingMatches,
 } from "@/lib/clients";
 import { getClientAlertHistory } from "@/lib/client-alerts";
 import { getListingsForViewer } from "@/lib/listings";
 import AgentProfileRequired from "@/components/AgentProfileRequired";
 import AlertSendButton from "../alerts/AlertSendButton";
+import DeleteClientButton from "./DeleteClientButton";
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -80,15 +82,33 @@ export default async function ClientDetailPage({
     ),
     getClientAlertHistory(session.user.id, session.accessToken, client.id),
   ]);
-  const matches = getClientListingMatches(client, listings);
+  const matches = getClientListingMatches(client, listings, {
+    alertOnly: true,
+  });
   const sentListingIds = alertHistory
     .filter((send) => send.status === "Sent")
     .map((send) => send.listingId);
+  const alertDiagnostics = getClientAlertMatchDiagnostics(
+    client,
+    listings,
+    sentListingIds
+  );
   const alertMatches = getClientListingMatches(client, listings, {
     alertOnly: true,
     excludeListingIds: sentListingIds,
     limit: 5,
   });
+  const sentAlertMatches = getClientListingMatches(client, listings, {
+    alertOnly: true,
+    limit: 5,
+  }).filter((listing) => sentListingIds.includes(listing.id));
+  const resendAlertMatches =
+    sentAlertMatches.length > 0
+      ? sentAlertMatches
+      : getClientListingMatches(client, listings, {
+          alertOnly: true,
+          limit: 5,
+        });
 
   return (
     <main className="min-h-screen bg-gray-100 py-12 px-6">
@@ -105,12 +125,18 @@ export default async function ClientDetailPage({
             <p className="mt-2 text-gray-600">{client.email}</p>
           </div>
 
-          <Link
-            href={`/clients/${client.id}/edit`}
-            className="inline-flex items-center justify-center rounded-lg bg-emerald-700 px-5 py-3 font-semibold text-white transition hover:bg-emerald-800"
-          >
-            Edit Client
-          </Link>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              href={`/clients/${client.id}/edit`}
+              className="inline-flex items-center justify-center rounded-lg bg-emerald-700 px-5 py-3 font-semibold text-white transition hover:bg-emerald-800"
+            >
+              Edit Client
+            </Link>
+            <DeleteClientButton
+              clientId={client.id}
+              clientName={client.name}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
@@ -157,12 +183,13 @@ export default async function ClientDetailPage({
 
             <div className="rounded-xl bg-white p-6 shadow-md">
               <h2 className="mb-4 text-2xl font-bold text-black">
-                Matching Listings
+                Alert-Eligible Matches
               </h2>
 
               {matches.length === 0 ? (
                 <p className="text-gray-600">
-                  No current listings match this saved criteria.
+                  No approved listings match this client&apos;s saved criteria
+                  and alert market statuses.
                 </p>
               ) : (
                 <div className="grid gap-4">
@@ -212,9 +239,9 @@ export default async function ClientDetailPage({
                   </span>
                 </p>
                 <p>
-                  <span className="text-gray-500">Market:</span>{" "}
+                  <span className="text-gray-500">Alert Markets:</span>{" "}
                   <span className="font-semibold text-black">
-                    {client.preferredMarketStatus ?? "Any"}
+                    {client.alertMarketStatuses.join(", ")}
                   </span>
                 </p>
                 <p>
@@ -235,7 +262,7 @@ export default async function ClientDetailPage({
             </div>
 
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-blue-900">
-              <h2 className="mb-2 text-xl font-bold">Alert Status</h2>
+              <h2 className="mb-2 text-xl font-bold">Listing Alert</h2>
               <div className="space-y-2 text-sm">
                 <p>
                   {client.alertEnabled
@@ -243,11 +270,23 @@ export default async function ClientDetailPage({
                     : "Alerts are disabled, but manual Send now is available."}
                 </p>
                 <p>Alert markets: {client.alertMarketStatuses.join(", ")}</p>
-                <p>Unsent matches: {alertMatches.length}</p>
+                <p>New matches ready to send: {alertMatches.length}</p>
+                <p>
+                  Approved: {alertDiagnostics.approvedListingCount} / Alert
+                  markets: {alertDiagnostics.alertMarketListingCount} /
+                  Criteria matches: {alertDiagnostics.eligibleMatchCount}
+                </p>
                 <p>Last sent: {formatDate(client.alertLastSentAt)}</p>
               </div>
               <div className="mt-4">
-                <AlertSendButton clientId={client.id} />
+                <AlertSendButton
+                  clientId={client.id}
+                  hasAlreadySentMatches={resendAlertMatches.length > 0}
+                  previewListingIds={alertMatches.map((listing) => listing.id)}
+                  resendListingIds={resendAlertMatches.map(
+                    (listing) => listing.id
+                  )}
+                />
               </div>
               {alertHistory[0] && (
                 <div className="mt-4 rounded-lg bg-white/70 p-3 text-sm">

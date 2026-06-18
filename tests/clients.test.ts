@@ -12,6 +12,7 @@ vi.mock("@/lib/supabase", () => ({
 
 import {
   createAgentClient,
+  deleteAgentClient,
   getAgentClients,
   getClientListingMatches,
 } from "@/lib/clients";
@@ -29,13 +30,15 @@ const clientRow = {
   preferred_location: "Bole",
   preferred_property_type: "Apartment",
   preferred_transaction_type: "For Sale",
-  preferred_market_status: "Active",
+  preferred_market_status: null,
   min_price: 1_000_000,
   max_price: 15_000_000,
   min_bedrooms: 2,
   min_bathrooms: 1,
   alert_enabled: true,
   alert_frequency: "Daily",
+  alert_market_statuses: ["Active"],
+  alert_last_checked_at: null,
   alert_last_sent_at: null,
   alert_matched_listing_ids: [],
   created_at: "2026-06-15T12:00:00.000Z",
@@ -77,13 +80,13 @@ describe("agent clients", () => {
     formData.set("preferredLocation", "Summit");
     formData.set("preferredPropertyType", "Villa");
     formData.set("preferredTransactionType", "For Rent");
-    formData.set("preferredMarketStatus", "Active");
     formData.set("minPrice", "1000");
     formData.set("maxPrice", "5000");
     formData.set("minBedrooms", "3");
     formData.set("minBathrooms", "2");
     formData.set("alertEnabled", "on");
     formData.set("alertFrequency", "Weekly");
+    formData.append("alertMarketStatuses", "Active");
     mocks.authenticatedSupabaseRequest.mockResolvedValue([
       {
         ...clientRow,
@@ -116,6 +119,37 @@ describe("agent clients", () => {
       createAgentClient(formData, authUser.id, "user-access-token")
     ).rejects.toThrow("A valid email is required.");
     expect(mocks.authenticatedSupabaseRequest).not.toHaveBeenCalled();
+  });
+
+  it("deletes only an owner-scoped client after Supabase returns a row", async () => {
+    mocks.authenticatedSupabaseRequest.mockResolvedValue([
+      {
+        id: "client-1",
+        owner_id: authUser.id,
+      },
+    ]);
+
+    await expect(
+      deleteAgentClient("client-1", authUser.id, "user-access-token")
+    ).resolves.toEqual({
+      id: "client-1",
+      owner_id: authUser.id,
+    });
+    expect(mocks.authenticatedSupabaseRequest).toHaveBeenCalledWith(
+      `/agent_clients?id=eq.client-1&owner_id=eq.${authUser.id}`,
+      "user-access-token",
+      expect.objectContaining({
+        method: "DELETE",
+      })
+    );
+  });
+
+  it("rejects client delete when no owner-filtered row is returned", async () => {
+    mocks.authenticatedSupabaseRequest.mockResolvedValue([]);
+
+    await expect(
+      deleteAgentClient("client-1", authUser.id, "user-access-token")
+    ).rejects.toThrow("Client not found or access denied.");
   });
 
   it("matches listings against saved client criteria", () => {
@@ -162,6 +196,8 @@ describe("agent clients", () => {
         minBathrooms: client.min_bathrooms,
         alertEnabled: client.alert_enabled,
         alertFrequency: "Daily",
+        alertMarketStatuses: ["Active"],
+        alertLastCheckedAt: client.alert_last_checked_at,
         alertLastSentAt: client.alert_last_sent_at,
         alertMatchedListingIds: [],
         createdAt: client.created_at,

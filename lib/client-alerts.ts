@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { AgentSession } from "@/lib/auth";
 import {
   type AgentClient,
+  getClientAlertMatchDiagnostics,
   getAgentClientById,
   getClientListingMatches,
 } from "@/lib/clients";
@@ -316,6 +317,29 @@ async function getSuccessfullySentListingIds(
   return rows.map((row) => row.listing_id);
 }
 
+export async function getSentAlertListingIdsByClient(
+  ownerId: string,
+  accessToken: string
+) {
+  const rows = await authenticatedSupabaseRequest<
+    Pick<ClientAlertSendRow, "agent_client_id" | "listing_id">[]
+  >(
+    `/client_alert_sends?select=agent_client_id,listing_id&agent_owner_id=eq.${encodeURIComponent(
+      ownerId
+    )}&status=eq.Sent`,
+    accessToken
+  );
+  const sentListingIdsByClient = new Map<string, string[]>();
+
+  rows.forEach((row) => {
+    const ids = sentListingIdsByClient.get(row.agent_client_id) ?? [];
+    ids.push(row.listing_id);
+    sentListingIdsByClient.set(row.agent_client_id, ids);
+  });
+
+  return sentListingIdsByClient;
+}
+
 async function getRecentSend(
   clientId: string,
   ownerId: string,
@@ -435,12 +459,16 @@ export async function getClientAlertHistory(
 
 export async function sendListingAlertNow({
   clientId,
+  includePreviouslySent = false,
   listings,
+  previewListingIds,
   session,
   siteUrl,
 }: {
   clientId: string;
+  includePreviouslySent?: boolean;
   listings: Property[];
+  previewListingIds?: string[];
   session: AgentSession;
   siteUrl: string;
 }) {
@@ -485,24 +513,70 @@ export async function sendListingAlertNow({
     };
   }
 
-  const previouslySentListingIds = await getSuccessfullySentListingIds(
-    client.id,
-    session.user.id,
-    session.accessToken
-  );
-  const matches = getClientListingMatches(client, listings, {
+  const previewListingIdSet =
+    previewListingIds && previewListingIds.length > 0
+      ? new Set(previewListingIds)
+      : null;
+  const scopedListings = previewListingIdSet
+    ? listings.filter((listing) => previewListingIdSet.has(listing.id))
+    : listings;
+  const eligibleMatches = getClientListingMatches(client, scopedListings, {
     alertOnly: true,
-    excludeListingIds: previouslySentListingIds,
     limit: maxListingsPerEmail,
   });
+  const previouslySentListingIds = includePreviouslySent
+    ? []
+    : await getSuccessfullySentListingIds(
+        client.id,
+        session.user.id,
+        session.accessToken
+      );
+  const matches = includePreviouslySent
+    ? eligibleMatches
+    : getClientListingMatches(client, scopedListings, {
+        alertOnly: true,
+        excludeListingIds: previouslySentListingIds,
+        limit: maxListingsPerEmail,
+      });
 
   if (matches.length === 0) {
     await updateAlertTimestamps(client, session.accessToken, checkedAt);
+    const alertDiagnostics = getClientAlertMatchDiagnostics(
+      client,
+      scopedListings,
+      previouslySentListingIds
+    );
+    const diagnostics = {
+      previewListingCount: previewListingIds?.length ?? null,
+      serverVisibleListingCount: listings.length,
+      scopedListingCount: scopedListings.length,
+      eligibleMatchCount: eligibleMatches.length,
+      previouslySentCount: previouslySentListingIds.length,
+      approvedListingCount: alertDiagnostics.approvedListingCount,
+      alertMarketListingCount: alertDiagnostics.alertMarketListingCount,
+      unsentMatchCount: alertDiagnostics.unsentMatchCount,
+    };
+
+    if (previewListingIdSet && scopedListings.length === 0) {
+      return {
+        ok: true,
+        status: 200,
+        message:
+          "The previewed listing is no longer visible to this session. Refresh alerts and try again.",
+        sentCount: 0,
+        diagnostics,
+      };
+    }
+
     return {
       ok: true,
       status: 200,
-      message: "No unsent matching listings found.",
+      message:
+        eligibleMatches.length > 0
+          ? "All matching listings were already sent to this client. Use Resend matches to send them again."
+          : "No matching listings found.",
       sentCount: 0,
+      diagnostics,
     };
   }
 

@@ -10,7 +10,6 @@ import {
   clientStatuses,
 } from "@/lib/clients";
 import {
-  marketStatuses,
   propertyTypes,
   transactionTypes,
 } from "@/lib/listing-rules";
@@ -243,26 +242,6 @@ export default function ClientForm({
 
             <div>
               <label className="mb-2 block font-semibold text-black">
-                Market Status
-              </label>
-              <select
-                name="preferredMarketStatus"
-                defaultValue={
-                  client?.preferredMarketStatus ??
-                  defaultValues?.preferredMarketStatus ??
-                  ""
-                }
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-black"
-              >
-                <option value="">Any</option>
-                {marketStatuses.map((status) => (
-                  <option key={status}>{status}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block font-semibold text-black">
                 Minimum Price
               </label>
               <input
@@ -320,7 +299,7 @@ export default function ClientForm({
 
           <div className="mt-5">
             <p className="mb-2 block font-semibold text-black">
-              Alert Market Statuses
+              Market Statuses for Alerts
             </p>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               {alertMarketStatuses.map((status) => {
