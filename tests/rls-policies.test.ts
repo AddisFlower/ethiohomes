@@ -51,9 +51,12 @@ describe("RLS policy migration contract", () => {
     expect(policies).not.toContain("function public.is_admin()");
   });
 
-  it("lets authenticated users read only their own profile", () => {
+  it("lets authenticated users read and update only their own profile", () => {
     expect(policies).toMatch(
       /policy profiles_select_own[\s\S]*for select[\s\S]*to authenticated[\s\S]*using \(id = auth\.uid\(\)\)/i
+    );
+    expect(policies).toMatch(
+      /policy profiles_update_own[\s\S]*for update[\s\S]*to authenticated[\s\S]*id = auth\.uid\(\)[\s\S]*with check[\s\S]*id = auth\.uid\(\)/i
     );
   });
 
@@ -171,6 +174,7 @@ describe("RLS rollback contract", () => {
       "agent_clients_update_owned",
       "agent_clients_insert_owned",
       "agent_clients_select_owned",
+      "profiles_update_own",
       "profiles_select_own",
       "listings_select_public",
       "listings_select_authenticated",

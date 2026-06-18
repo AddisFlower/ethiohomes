@@ -273,6 +273,13 @@ export default function NavbarMenu({
                     {displayName}
                   </p>
                   <Link
+                    href="/profile"
+                    onClick={closeMenu}
+                    className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Profile
+                  </Link>
+                  <Link
                     href="/"
                     onClick={closeMenu}
                     className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
@@ -489,6 +496,9 @@ export default function NavbarMenu({
                     </Link>
                     {canUseAgent && (
                       <>
+                        <Link href="/profile" onClick={closeMenu}>
+                          Profile
+                        </Link>
                         <Link href="/my-listings" onClick={closeMenu}>
                           My Listings
                         </Link>

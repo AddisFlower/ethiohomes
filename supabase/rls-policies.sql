@@ -155,6 +155,20 @@ for select
 to authenticated
 using (id = auth.uid());
 
+drop policy if exists profiles_update_own on public.profiles;
+create policy profiles_update_own
+on public.profiles
+for update
+to authenticated
+using (
+  (select ethiomls_private.is_agent_or_admin())
+  and id = auth.uid()
+)
+with check (
+  (select ethiomls_private.is_agent_or_admin())
+  and id = auth.uid()
+);
+
 drop policy if exists listings_select_public on public.listings;
 create policy listings_select_public
 on public.listings
@@ -353,7 +367,7 @@ with check (
   and (storage.foldername(name))[1] = auth.uid()::text
 );
 
-grant select on public.profiles to authenticated;
+grant select, update on public.profiles to authenticated;
 grant select on public.listings to anon, authenticated;
 grant insert, update, delete on public.listings to authenticated;
 grant insert on public.showing_requests to anon, authenticated;

@@ -19,6 +19,7 @@ export type Profile = {
   id: string;
   full_name: string | null;
   agency_name: string | null;
+  public_contact_email: string | null;
   role: "agent" | "admin";
 };
 

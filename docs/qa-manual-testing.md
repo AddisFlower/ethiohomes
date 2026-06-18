@@ -75,6 +75,21 @@ Use a non-owner visitor or agent for each test.
 9. Send a direct POST to `/api/showing-requests` for every ineligible status and confirm it is rejected.
 10. Confirm only successful Approved + Active requests appear in the owner's Showing Requests page.
 
+## Agent Public Contact Email
+
+1. Sign in as the listing owner and open `/profile`.
+2. Set Public Contact Email to a tester-controlled email address and save.
+3. Submit a showing request as a public visitor for one of that agent's
+   Approved + Active listings.
+4. Expected: the success confirmation shows the configured public contact
+   email as the clickable contact link.
+5. Return to `/profile`, clear Public Contact Email, and save.
+6. Submit another showing request using a different requester email.
+7. Expected: the request still succeeds, but the success confirmation does not
+   expose the agent's Supabase login email.
+8. Try saving an invalid Public Contact Email.
+9. Expected: the profile save is rejected with a friendly validation message.
+
 ## Add Listing Validation
 
 1. Confirm market options are Coming Soon, Active, and Off Market only.
@@ -162,13 +177,37 @@ Use a non-owner visitor or agent for each test.
 11. Open `/clients/follow-ups`.
 12. Expected: clients with due follow-up dates appear.
 13. Open `/clients/alerts`.
-14. Expected: alert-enabled clients appear with match counts and a clear note
-    that email sending is not enabled yet.
-15. From `/showing-requests`, click Add to Clients on a request.
-16. Expected: `/clients/new` opens with name, email, phone, source, and notes
+14. Expected: clients appear with approved-listing, alert-market, criteria,
+    new-match, and sent-before counts.
+15. Confirm Ready to Send, Already Sent, and Excluded listings explain which
+    properties will or will not be emailed.
+16. Click Send new matches for a test client using a tester-controlled email.
+17. Expected: the route sends through Resend, records alert history, and shows
+    a successful result.
+18. Click Resend eligible matches within 5 minutes.
+19. Expected: the repeat-send guard blocks the send with a clear wait message.
+20. After the wait window, click Resend eligible matches.
+21. Expected: eligible previously sent matches can be sent again and history
+    records the result.
+22. From `/showing-requests`, click Add to Clients on a request.
+23. Expected: `/clients/new` opens with name, email, phone, source, and notes
     prefilled from the showing request.
-17. Sign in as a different agent.
-18. Expected: the first agent's clients do not appear.
-19. Sign in as an admin who does not own those client records.
-20. Expected: admin access does not grant global access to other agents'
+24. Sign in as a different agent.
+25. Expected: the first agent's clients do not appear.
+26. Sign in as an admin who does not own those client records.
+27. Expected: admin access does not grant global access to other agents'
     clients.
+
+## Public Lead Form Abuse Controls
+
+1. Submit a normal showing request for an Approved + Active listing.
+2. Expected: the request succeeds and appears in the listing owner's Showing
+   Requests page.
+3. Submit the same listing/email combination again.
+4. Expected: the duplicate request is blocked with a clear message.
+5. Submit requests from the same client IP more than five times within 10
+   minutes.
+6. Expected: later submissions are temporarily rate limited.
+7. Submit an invalid email, a message over 1000 characters, a name over 120
+   characters, and a phone value over 40 characters.
+8. Expected: each invalid request is rejected without creating a lead row.

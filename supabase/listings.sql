@@ -2,6 +2,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text,
   agency_name text,
+  public_contact_email text,
   role text not null default 'agent' check (role in ('agent', 'admin')),
   created_at timestamptz not null default now()
 );
@@ -140,6 +141,9 @@ add column if not exists transaction_type text;
 alter table public.listings
 add column if not exists market_status text;
 
+alter table public.profiles
+add column if not exists public_contact_email text;
+
 alter table public.listings
 alter column status set default 'For Sale';
 
@@ -194,6 +198,20 @@ alter column bathrooms drop not null;
 
 do $$
 begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'profiles_public_contact_email_check'
+      and conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles
+    add constraint profiles_public_contact_email_check
+    check (
+      public_contact_email is null
+      or public_contact_email ~* '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
+    );
+  end if;
+
   if not exists (
     select 1
     from pg_constraint

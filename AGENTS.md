@@ -49,8 +49,8 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Non-owner request showing success state.
 - Save Listing UI is hidden until client accounts support persistent favorites.
 - Public/non-owner showing requests persist to Supabase and can be reviewed by agents.
-- Successful showing requests display the listing agent's Supabase account
-  email as a clickable contact link when the server-side lookup succeeds.
+- Successful showing requests display the listing agent's public contact email
+  as a clickable contact link when the agent has configured one.
 - Owner-only primary photo management page.
 - Add Listing supports optional Supabase Storage image upload.
 - Supabase-backed admin approval workflow with role-checked admin access.
@@ -78,14 +78,14 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
 - Listing visibility is role-aware for public visitors, agents, owners, and admins.
 - Listing collections default to newest uploaded first using `created_at`.
 - Agent/admin Clients dropdown and outreach workspace are implemented with
-  Client Leads, Client List, Add Client, Follow-ups, and Automated Alerts
-  preparation.
+  Client Leads, Client List, Add Client, Follow-ups, and manual Automated
+  Alerts sending.
 - Agent-owned client records support contact details, source, status, notes,
   next follow-up date, saved listing criteria, alert frequency, and matching
   listing previews.
 - Showing Requests can prefill a new client record through Add to Clients.
-- Automated client email sending is not enabled yet; alert criteria are stored
-  for future email infrastructure.
+- Manual client listing alert emails are implemented through Resend; scheduled
+  automated alert sending is not enabled yet.
 - Showing requests are limited to Approved + Active listings in both UI and server logic.
 - Residential room fields are required; Land stores null rooms; Commercial/Office use optional bathrooms and null bedrooms.
 - Add Listing excludes Pending and Closed; Edit Listing supports the full market lifecycle.
@@ -103,6 +103,8 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
   - `docs/rls-rollout-testing.md`
 - Public showing-request inserts use `Prefer: return=minimal` so anonymous
   users do not need read access to private lead rows.
+- Agent profiles include an optional `public_contact_email`; showing-request
+  confirmations no longer expose the agent's Supabase Auth login email.
 
 ## Supabase Integration Status
 - Supabase/Postgres is the active persistence layer for listings.
@@ -200,6 +202,8 @@ Important columns:
 - `id uuid primary key references auth.users(id)` - Supabase Auth user ID.
 - `full_name text`
 - `agency_name text`
+- `public_contact_email text` - optional public-facing contact email shown
+  after successful showing requests.
 - `role text not null default 'agent'` - either `agent` or `admin`.
 - `created_at timestamptz`
 
@@ -264,13 +268,12 @@ Seed data:
   - Admins do not get global showing request access; admins see only requests for listings they personally own.
   - Showing requests are agent-owned lead data, not global admin moderation data.
   - Requests are accepted only for Approved + Active listings.
-  - After a successful submission, the server performs a best-effort
-    service-role Auth lookup for the listing owner's email and returns it for
-    the success confirmation.
+  - After a successful submission, the server performs a best-effort lookup for
+    the listing owner's `profiles.public_contact_email` and returns it for the
+    success confirmation when configured.
   - A contact lookup failure does not fail or duplicate the stored showing
     request.
-  - TODO: Replace the account email with a dedicated agent-controlled public
-    contact email before expanding agent profile settings.
+  - Agents can manage the dedicated public contact email on `/profile`.
   - Coming Soon, Pending, Closed, Off Market, Unapproved, and Rejected listings cannot receive showing requests.
   - Email notifications are not implemented yet.
   - Deleting a listing cascades deletion to its showing requests.
@@ -851,7 +854,137 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
       `429` handling.
     - Add UI/manual QA for `/clients/alerts`, client detail alert panel, send
       results, alert history, and `View Details` links.
-- Latest implemented slice: agent-side Clients outreach workspace.
+- Latest implemented slice: public lead hardening, public contact email, and
+  client alert detail cleanup.
+  - Public showing-request submissions now have route-level request-size
+    rejection, malformed JSON handling, and a basic in-process IP rate limit.
+  - `createShowingRequest()` validates field types and lengths, normalizes
+    requester email, and blocks duplicate showing requests for the same
+    listing/email within 24 hours using a service-role duplicate lookup.
+  - Agent profiles now include optional `public_contact_email`.
+  - New routes/pages:
+    - `/profile`
+    - `PATCH /api/profile`
+  - Agents/admins can manage full name, agency name, and public contact email
+    from `/profile`.
+  - Showing-request success confirmations use
+    `profiles.public_contact_email` only. If the field is blank, the app does
+    not expose the agent's Supabase Auth login email.
+  - `supabase/listings.sql` adds `profiles.public_contact_email` and an email
+    format constraint.
+  - `supabase/rls-policies.sql` adds owner-scoped authenticated profile
+    updates; `supabase/rls-rollback.sql` drops the new policy.
+  - `/clients/[id]` Listing Alert panel was simplified to keep the send/resend
+    actions and remove diagnostic/debug text. Detailed match diagnostics remain
+    on `/clients/alerts`.
+  - Manual QA passed for public contact email behavior after applying the SQL:
+    configured public email appears after successful showing requests, and
+    clearing it avoids login-email exposure.
+  - Local verification after this slice:
+    - `npm.cmd run lint`
+    - `npm.cmd run test -- --configLoader runner` with 106 tests
+    - `npm.cmd run build`
+  - Recommended checkpoint commit message:
+    `Harden showing requests and add public agent contact email`
+- Previous implemented slice: manual agent-side client listing alert emails and
+  client workspace polish.
+  - Resend-backed manual listing alert emails are implemented.
+  - Resend was configured and locally tested successfully with the temporary
+    sending domain:
+    - Domain: `ethiomls.online`
+    - Sending subdomain: `alerts.ethiomls.online`
+    - From email pattern: `alerts@alerts.ethiomls.online`
+  - Required environment variables:
+    - `RESEND_API_KEY`
+    - `LISTING_ALERT_FROM_EMAIL`
+    - `LISTING_ALERT_REPLY_TO_EMAIL`
+    - `LISTING_ALERT_PRODUCT_NAME`
+    - `NEXT_PUBLIC_SITE_URL`
+    - Optional: `LISTING_ALERT_MAX_SENDS_PER_MINUTE`
+  - Resend API key should use sending-only access when possible.
+  - Local Resend test passed from the app.
+  - Resend env vars were added in Vercel by the user.
+  - New alert send route:
+    - `POST /api/client-alerts/send`
+    - Signed-in agent/admin only.
+    - Sends for one owned client record at a time.
+    - Manual sends are allowed even when `alert_enabled = false`.
+    - A 5-minute per-client repeat guard is enforced.
+    - App-level send cap uses `LISTING_ALERT_MAX_SENDS_PER_MINUTE`, default
+      `60`.
+    - Resend `429` failures are recorded as failed alert history rows.
+  - New alert history table and fields are in `supabase/listings.sql`:
+    - `public.client_alert_sends`
+    - `agent_clients.alert_market_statuses`
+    - `agent_clients.alert_last_checked_at`
+    - `agent_clients.alert_last_sent_at`
+    - `agent_clients.alert_matched_listing_ids`
+  - RLS policies in `supabase/rls-policies.sql` keep
+    `client_alert_sends` owner-only.
+  - `supabase/rls-rollback.sql` was updated for alert history policies.
+  - Alert email matching:
+    - Only `approval_status = Approved` listings can be emailed.
+    - Alert market statuses are limited to `Coming Soon`, `Active`, and
+      `Closed`.
+    - `Pending`, `Off Market`, `Unapproved`, and `Rejected` are excluded from
+      alert emails.
+    - Emails include up to 5 matching listings.
+    - Each listing includes a direct `View Details` link.
+    - Email includes agent-style copy and a lightweight preference sentence
+      asking the client to reply if they no longer want listing updates.
+    - TODO: Add a real unsubscribe/preference-management flow before scheduled
+      or automatic alert emails are enabled.
+  - Important UX decision:
+    - The old single client `preferred_market_status` filter was removed from
+      the client form and ignored by matching.
+    - Client saves now clear `preferred_market_status` to `null`.
+    - Market status for alert emails is now controlled only by
+      `alert_market_statuses`.
+    - This avoids confusing overlap between a generic market filter and alert
+      market-status multi-select.
+  - `/clients/alerts` was redesigned as a professional alert workspace:
+    - Shows metric strip per client: Approved Listings, In Alert Markets,
+      Criteria Matches, New Matches, Sent Before.
+    - Separates Ready to Send from Already Sent.
+    - Shows excluded listings and reasons in an expandable section.
+    - Uses `Send new matches` and `Resend eligible matches` actions.
+  - `/clients` was redesigned as a CRM-style table:
+    - Summary metrics for Total Clients, Active Pipeline, Due Follow-ups, and
+      Alerts Enabled.
+    - Table rows show client, status/source, saved criteria, next follow-up,
+      and alert state.
+  - `/clients/[id]` now shows alert-eligible matches rather than broad general
+    criteria matches that could include Pending or Off Market listings.
+  - Client deletion is implemented:
+    - `DELETE /api/clients/[id]`
+    - `deleteAgentClient()` in `lib/clients.ts`
+    - `DeleteClientButton` on `/clients/[id]`
+    - Delete is owner-scoped and requires Supabase to return the deleted row
+      before the API reports success.
+    - Missing/non-owned deletes return `404` with
+      `Client not found or access denied.`
+    - Deleting an `agent_clients` row cascades related `client_alert_sends`
+      through the database foreign key.
+  - Local verification after this slice:
+    - `npm.cmd run lint`
+    - `npm.cmd run test -- --configLoader runner` with 90 tests
+    - `npm.cmd run build`
+  - Recommended checkpoint commit message:
+    `Add manual client listing alert emails`
+  - Next session checklist:
+    - Commit the current work if it has not been committed.
+    - Add Resend env vars to Vercel and redeploy.
+    - Run updated `supabase/listings.sql` and `supabase/rls-policies.sql` in
+      any Supabase environment that has not received the alert schema/RLS
+      changes.
+    - Smoke test `/clients`, `/clients/[id]`, `/clients/[id]/edit`,
+      `/clients/alerts`, `Send new matches`, `Resend eligible matches`, and
+      `Delete Client`.
+    - Test with an agent-owned client using the tester's email before sending
+      to real client addresses.
+    - Keep sends manual for demos; do not implement scheduled/automatic sends
+      until unsubscribe/preference and abuse controls are designed.
+- Previous implemented slice: agent-side Clients outreach workspace.
   - Agent/admin navbar now includes a Clients dropdown with Client Leads,
     Client List, Add Client, Follow-ups, and Automated Alerts.
   - New pages/routes:
@@ -870,14 +1003,11 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
     owner-only; admins do not get global client/contact visibility.
   - Showing Requests now include Add to Clients links that prefill the new
     client form.
-- Automated Alerts page stores and previews alert criteria only. Actual
-  email sending is not implemented yet and should require provider choice,
-  consent/unsubscribe handling, duplicate suppression, rate limiting, and
-  alert run history.
-- For the first manual-send listing alert email, include a lightweight
-  preference sentence asking the client to reply if they no longer want listing
-  updates. TODO: add a real unsubscribe/preference-management option before
-  scheduled or automatic client alert emails are enabled.
+- Scheduled automated alerts are not implemented yet.
+  - Current alert emails are manual only.
+  - Scheduled sends later should require queue/worker behavior, unsubscribe or
+    preference management, consent handling, duplicate suppression, and stronger
+    abuse controls.
   - User applied the updated Supabase SQL and manually tested the Clients
     workflow successfully.
   - Local checks passed after implementation:

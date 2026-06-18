@@ -7,7 +7,6 @@ import {
 } from "@/lib/auth";
 import {
   getAgentClientById,
-  getClientAlertMatchDiagnostics,
   getClientListingMatches,
 } from "@/lib/clients";
 import { getClientAlertHistory } from "@/lib/client-alerts";
@@ -88,11 +87,6 @@ export default async function ClientDetailPage({
   const sentListingIds = alertHistory
     .filter((send) => send.status === "Sent")
     .map((send) => send.listingId);
-  const alertDiagnostics = getClientAlertMatchDiagnostics(
-    client,
-    listings,
-    sentListingIds
-  );
   const alertMatches = getClientListingMatches(client, listings, {
     alertOnly: true,
     excludeListingIds: sentListingIds,
@@ -263,21 +257,6 @@ export default async function ClientDetailPage({
 
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-blue-900">
               <h2 className="mb-2 text-xl font-bold">Listing Alert</h2>
-              <div className="space-y-2 text-sm">
-                <p>
-                  {client.alertEnabled
-                    ? `${client.alertFrequency} alert saved.`
-                    : "Alerts are disabled, but manual Send now is available."}
-                </p>
-                <p>Alert markets: {client.alertMarketStatuses.join(", ")}</p>
-                <p>New matches ready to send: {alertMatches.length}</p>
-                <p>
-                  Approved: {alertDiagnostics.approvedListingCount} / Alert
-                  markets: {alertDiagnostics.alertMarketListingCount} /
-                  Criteria matches: {alertDiagnostics.eligibleMatchCount}
-                </p>
-                <p>Last sent: {formatDate(client.alertLastSentAt)}</p>
-              </div>
               <div className="mt-4">
                 <AlertSendButton
                   clientId={client.id}
@@ -288,19 +267,6 @@ export default async function ClientDetailPage({
                   )}
                 />
               </div>
-              {alertHistory[0] && (
-                <div className="mt-4 rounded-lg bg-white/70 p-3 text-sm">
-                  <p className="font-semibold">
-                    Last result: {alertHistory[0].status}
-                  </p>
-                  <p>{alertHistory[0].listingTitle}</p>
-                  {alertHistory[0].errorMessage && (
-                    <p className="mt-1 text-red-700">
-                      {alertHistory[0].errorMessage}
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
           </aside>
         </div>

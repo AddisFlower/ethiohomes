@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   getAppSession: vi.fn(),
   getListingsForViewer: vi.fn(),
   sendListingAlertNow: vi.fn(),
+  updateOwnProfile: vi.fn(),
   updateListing: vi.fn(),
   updateListingApproval: vi.fn(),
   updateAgentClient: vi.fn(),
@@ -45,6 +46,15 @@ vi.mock("@/lib/listings", () => ({
 vi.mock("@/lib/showing-requests", () => ({
   createShowingRequest: mocks.createShowingRequest,
   getAgentContactEmail: mocks.getAgentContactEmail,
+  ShowingRequestError: class ShowingRequestError extends Error {
+    status: number;
+
+    constructor(message: string, status = 400) {
+      super(message);
+      this.name = "ShowingRequestError";
+      this.status = status;
+    }
+  },
 }));
 
 vi.mock("@/lib/clients", () => ({
@@ -56,6 +66,10 @@ vi.mock("@/lib/clients", () => ({
 
 vi.mock("@/lib/client-alerts", () => ({
   sendListingAlertNow: mocks.sendListingAlertNow,
+}));
+
+vi.mock("@/lib/profiles", () => ({
+  updateOwnProfile: mocks.updateOwnProfile,
 }));
 
 import { PATCH as updateApproval } from "@/app/api/admin/listings/[id]/approval/route";
@@ -71,6 +85,7 @@ import {
   PUT as updateListing,
 } from "@/app/api/listings/[id]/route";
 import { PUT as updateListingPhoto } from "@/app/api/listings/[id]/photo/route";
+import { PATCH as updateProfile } from "@/app/api/profile/route";
 import { POST as createShowingRequest } from "@/app/api/showing-requests/route";
 
 const routeContext = {
@@ -133,6 +148,16 @@ describe("protected listing route authorization", () => {
         ),
     ],
     [
+      "update profile",
+      () =>
+        updateProfile(
+          new Request("http://localhost/api/profile", {
+            method: "PATCH",
+            body: JSON.stringify({ publicContactEmail: "contact@example.com" }),
+          })
+        ),
+    ],
+    [
       "update",
       () =>
         updateListing(
@@ -180,6 +205,68 @@ describe("protected listing route authorization", () => {
       error: "Agent profile required.",
     });
     expect(mocks.updateListingApproval).not.toHaveBeenCalled();
+  });
+});
+
+describe("profile update route", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getAppSession.mockResolvedValue(agentSession);
+  });
+
+  it("updates the signed-in agent profile", async () => {
+    mocks.updateOwnProfile.mockResolvedValue({
+      id: agentSession.user.id,
+      full_name: "Agent Example",
+      agency_name: "Example Realty",
+      public_contact_email: "public@example.com",
+      role: "agent",
+    });
+
+    const response = await updateProfile(
+      new Request("http://localhost/api/profile", {
+        method: "PATCH",
+        body: JSON.stringify({
+          fullName: "Agent Example",
+          agencyName: "Example Realty",
+          publicContactEmail: "public@example.com",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateOwnProfile).toHaveBeenCalledWith(
+      agentSession.user.id,
+      agentSession.accessToken,
+      expect.objectContaining({
+        publicContactEmail: "public@example.com",
+      })
+    );
+    await expect(response.json()).resolves.toEqual({
+      profile: expect.objectContaining({
+        public_contact_email: "public@example.com",
+      }),
+    });
+  });
+
+  it("returns validation errors from the profile helper", async () => {
+    mocks.updateOwnProfile.mockRejectedValue(
+      new Error("Public contact email must be a valid email address.")
+    );
+
+    const response = await updateProfile(
+      new Request("http://localhost/api/profile", {
+        method: "PATCH",
+        body: JSON.stringify({
+          publicContactEmail: "not-an-email",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Public contact email must be a valid email address.",
+    });
   });
 });
 
@@ -314,7 +401,10 @@ describe("showing request identity handling", () => {
     const response = await createShowingRequest(
       new Request("http://localhost/api/showing-requests", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "203.0.113.10",
+        },
         body: JSON.stringify({
           listingId: "listing-1",
           name: "Test User",
@@ -352,7 +442,10 @@ describe("showing request identity handling", () => {
     const response = await createShowingRequest(
       new Request("http://localhost/api/showing-requests", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "203.0.113.11",
+        },
         body: JSON.stringify({
           listingId: "listing-1",
           name: "Test User",
@@ -373,5 +466,97 @@ describe("showing request identity handling", () => {
       "[EthioMLS] Agent contact email lookup failed.",
       expect.any(Error)
     );
+  });
+
+  it("rejects oversized showing request payloads before parsing JSON", async () => {
+    mocks.getAppSession.mockResolvedValue(publicSession);
+
+    const response = await createShowingRequest(
+      new Request("http://localhost/api/showing-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "content-length": "9000",
+          "x-forwarded-for": "203.0.113.12",
+        },
+        body: "{}",
+      })
+    );
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({
+      error: "Showing request is too large.",
+    });
+    expect(mocks.getAppSession).not.toHaveBeenCalled();
+    expect(mocks.createShowingRequest).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed showing request JSON", async () => {
+    mocks.getAppSession.mockResolvedValue(publicSession);
+
+    const response = await createShowingRequest(
+      new Request("http://localhost/api/showing-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "203.0.113.13",
+        },
+        body: "{",
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Request body must be valid JSON.",
+    });
+    expect(mocks.createShowingRequest).not.toHaveBeenCalled();
+  });
+
+  it("rate limits repeated showing request submissions from one IP", async () => {
+    mocks.getAppSession.mockResolvedValue(publicSession);
+    mocks.createShowingRequest.mockResolvedValue({
+      id: "request-1",
+      agentOwnerId: agentSession.user.id,
+    });
+
+    for (let index = 0; index < 5; index += 1) {
+      const response = await createShowingRequest(
+        new Request("http://localhost/api/showing-requests", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-forwarded-for": "203.0.113.14",
+          },
+          body: JSON.stringify({
+            listingId: "listing-1",
+            name: "Test User",
+            email: `test-${index}@example.com`,
+          }),
+        })
+      );
+
+      expect(response.status).toBe(200);
+    }
+
+    const response = await createShowingRequest(
+      new Request("http://localhost/api/showing-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "203.0.113.14",
+        },
+        body: JSON.stringify({
+          listingId: "listing-1",
+          name: "Test User",
+          email: "test-6@example.com",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "Too many showing requests. Please wait a few minutes before trying again.",
+    });
   });
 });

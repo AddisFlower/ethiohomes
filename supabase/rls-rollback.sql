@@ -27,6 +27,7 @@ drop policy if exists listings_insert_owned on public.listings;
 drop policy if exists listings_select_authenticated on public.listings;
 drop policy if exists listings_select_public on public.listings;
 
+drop policy if exists profiles_update_own on public.profiles;
 drop policy if exists profiles_select_own on public.profiles;
 
 alter table public.showing_requests disable row level security;

@@ -16,6 +16,7 @@ export const agentProfile: Profile = {
   id: authUser.id,
   full_name: "Agent Example",
   agency_name: "Example Realty",
+  public_contact_email: "contact@example.com",
   role: "agent",
 };
 

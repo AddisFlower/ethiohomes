@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { getListingById } from "@/lib/listings";
 import { getShowingEligibility } from "@/lib/listing-rules";
+import { getPublicContactEmailForProfile } from "@/lib/profiles";
 import {
   anonymousSupabaseRequest,
   authenticatedSupabaseRequest,
-  serviceRoleSupabaseAuthRequest,
+  serviceRoleSupabaseRequest,
 } from "@/lib/supabase";
 
 export type ShowingRequest = {
@@ -46,9 +47,15 @@ export type ShowingRequestInput = {
   preferredDatetime?: string;
 };
 
-type SupabaseAdminUser = {
-  email?: string;
-};
+export class ShowingRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = "ShowingRequestError";
+    this.status = status;
+  }
+}
 
 function toShowingRequest(row: ShowingRequestRow): ShowingRequest {
   return {
@@ -67,8 +74,51 @@ function toShowingRequest(row: ShowingRequestRow): ShowingRequest {
   };
 }
 
-function cleanOptional(value: string | undefined) {
-  const cleaned = value?.trim();
+function cleanRequiredString(
+  value: unknown,
+  fieldName: string,
+  maxLength: number
+) {
+  if (typeof value !== "string") {
+    throw new ShowingRequestError(`${fieldName} is required.`);
+  }
+
+  const cleaned = value.trim();
+
+  if (!cleaned) {
+    throw new ShowingRequestError(`${fieldName} is required.`);
+  }
+
+  if (cleaned.length > maxLength) {
+    throw new ShowingRequestError(
+      `${fieldName} must be ${maxLength} characters or fewer.`
+    );
+  }
+
+  return cleaned;
+}
+
+function cleanOptionalString(
+  value: unknown,
+  fieldName: string,
+  maxLength: number
+) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new ShowingRequestError(`${fieldName} must be text.`);
+  }
+
+  const cleaned = value.trim();
+
+  if (cleaned.length > maxLength) {
+    throw new ShowingRequestError(
+      `${fieldName} must be ${maxLength} characters or fewer.`
+    );
+  }
+
   return cleaned ? cleaned : null;
 }
 
@@ -76,14 +126,31 @@ function assertEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-export async function getAgentContactEmail(agentOwnerId: string) {
-  // TODO: Replace the login email with a dedicated public contact field.
-  const user = await serviceRoleSupabaseAuthRequest<SupabaseAdminUser>(
-    `/admin/users/${encodeURIComponent(agentOwnerId)}`
+async function assertNoRecentDuplicateShowingRequest(
+  listingId: string,
+  requesterEmail: string
+) {
+  const cutoff = encodeURIComponent(
+    new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   );
-  const email = user.email?.trim();
+  const rows = await serviceRoleSupabaseRequest<Pick<ShowingRequestRow, "id">[]>(
+    `/showing_requests?select=id&listing_id=eq.${encodeURIComponent(
+      listingId
+    )}&requester_email=eq.${encodeURIComponent(
+      requesterEmail
+    )}&created_at=gte.${cutoff}&limit=1`
+  );
 
-  return email && assertEmail(email) ? email : null;
+  if (rows.length > 0) {
+    throw new ShowingRequestError(
+      "A showing request for this listing was already submitted with this email recently.",
+      409
+    );
+  }
+}
+
+export async function getAgentContactEmail(agentOwnerId: string) {
+  return getPublicContactEmailForProfile(agentOwnerId);
 }
 
 export async function createShowingRequest(
@@ -91,44 +158,44 @@ export async function createShowingRequest(
   requesterUserId?: string,
   accessToken?: string
 ) {
-  const listingId = input.listingId?.trim();
-  const requesterName = input.name?.trim();
-  const requesterEmail = input.email?.trim();
+  const listingId = cleanRequiredString(input.listingId, "Listing", 120);
+  const requesterName = cleanRequiredString(input.name, "Name", 120);
+  const requesterEmail = cleanRequiredString(input.email, "Email", 254)
+    .toLowerCase();
 
-  if (!listingId) {
-    throw new Error("Listing is required.");
-  }
-
-  if (!requesterName) {
-    throw new Error("Name is required.");
-  }
-
-  if (!requesterEmail || !assertEmail(requesterEmail)) {
-    throw new Error("A valid email is required.");
+  if (!assertEmail(requesterEmail)) {
+    throw new ShowingRequestError("A valid email is required.");
   }
 
   const listing = await getListingById(listingId, accessToken);
-
   if (!listing) {
-    throw new Error("Listing not found.");
+    throw new ShowingRequestError("Listing not found.", 404);
   }
 
   if (requesterUserId && listing.ownerId === requesterUserId) {
-    throw new Error("Owners cannot request showings for their own listings.");
+    throw new ShowingRequestError(
+      "Owners cannot request showings for their own listings."
+    );
   }
 
   const showingEligibility = getShowingEligibility(listing);
 
   if (!showingEligibility.allowed) {
-    throw new Error(
+    throw new ShowingRequestError(
       showingEligibility.message ?? "This listing is not accepting showings."
     );
   }
 
+  await assertNoRecentDuplicateShowingRequest(listing.id, requesterEmail);
+
   const id = randomUUID();
-  const requesterPhone = cleanOptional(input.phone);
-  const preferredDatetime = cleanOptional(input.preferredDatetime);
-  const message = cleanOptional(input.message);
+  const requesterPhone = cleanOptionalString(input.phone, "Phone", 40);
+  const preferredDatetime = cleanOptionalString(
+    input.preferredDatetime,
+    "Preferred date/time",
+    120
+  );
+  const message = cleanOptionalString(input.message, "Message", 1000);
   const requestInit: RequestInit = {
     method: "POST",
     headers: {
