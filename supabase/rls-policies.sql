@@ -367,7 +367,11 @@ with check (
   and (storage.foldername(name))[1] = auth.uid()::text
 );
 
-grant select, update on public.profiles to authenticated;
+grant select on public.profiles to authenticated;
+revoke update on public.profiles from authenticated;
+grant update (full_name, agency_name, public_contact_email)
+on public.profiles
+to authenticated;
 grant select on public.listings to anon, authenticated;
 grant insert, update, delete on public.listings to authenticated;
 grant insert on public.showing_requests to anon, authenticated;

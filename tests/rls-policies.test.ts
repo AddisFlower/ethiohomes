@@ -58,6 +58,15 @@ describe("RLS policy migration contract", () => {
     expect(policies).toMatch(
       /policy profiles_update_own[\s\S]*for update[\s\S]*to authenticated[\s\S]*id = auth\.uid\(\)[\s\S]*with check[\s\S]*id = auth\.uid\(\)/i
     );
+    expect(policies).toMatch(
+      /revoke update on public\.profiles from authenticated/i
+    );
+    expect(policies).toMatch(
+      /grant update \(full_name, agency_name, public_contact_email\)[\s\S]*on public\.profiles[\s\S]*to authenticated/i
+    );
+    expect(policies).not.toMatch(
+      /grant select, update on public\.profiles to authenticated/i
+    );
   });
 
   it("matches public and role-aware listing visibility rules", () => {

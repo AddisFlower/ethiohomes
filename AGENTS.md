@@ -873,7 +873,10 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
   - `supabase/listings.sql` adds `profiles.public_contact_email` and an email
     format constraint.
   - `supabase/rls-policies.sql` adds owner-scoped authenticated profile
-    updates; `supabase/rls-rollback.sql` drops the new policy.
+    updates; authenticated profile updates are column-limited to
+    `full_name`, `agency_name`, and `public_contact_email` so users cannot
+    elevate their `role` through direct Supabase REST calls.
+    `supabase/rls-rollback.sql` drops the new policy.
   - `/clients/[id]` Listing Alert panel was simplified to keep the send/resend
     actions and remove diagnostic/debug text. Detailed match diagnostics remain
     on `/clients/alerts`.
@@ -884,6 +887,9 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
     - `npm.cmd run lint`
     - `npm.cmd run test -- --configLoader runner` with 106 tests
     - `npm.cmd run build`
+  - Quick security pass found and fixed an RLS grant issue where owner profile
+    updates were initially table-wide; `tests/rls-policies.test.ts` now asserts
+    the column-limited grant.
   - Recommended checkpoint commit message:
     `Harden showing requests and add public agent contact email`
 - Previous implemented slice: manual agent-side client listing alert emails and
