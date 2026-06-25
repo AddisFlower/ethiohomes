@@ -151,6 +151,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
 # Required for internal scheduled listing-alert runner calls.
 CLIENT_ALERT_RUN_SECRET=GENERATE_A_LONG_RANDOM_SECRET
+# Required for Vercel Cron invocation auth on /api/client-alerts/run.
+CRON_SECRET=GENERATE_A_LONG_RANDOM_SECRET
 # Optional: explicitly enable mock read fallback in a demo deployment.
 ETHIOMLS_ENABLE_MOCK_LISTINGS=true
 ```
@@ -952,9 +954,14 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
     - `Weekly`: due when last checked/sent is at least 7 days old.
   - Scheduled sends use the agent profile as sender identity and include the
     existing alert unsubscribe link.
-  - Vercel Cron is not configured yet. First production use should call the
-    route with `dryRun: true`, inspect results, then enable non-dry-run with a
-    small limit.
+  - Vercel Cron is configured in `vercel.json` to invoke
+    `/api/client-alerts/run` daily at `0 13 * * *` UTC.
+  - Vercel Cron uses `GET /api/client-alerts/run`, protected by `CRON_SECRET`
+    through the Vercel-provided `Authorization: Bearer ...` header.
+  - Manual runner testing still uses `POST /api/client-alerts/run`, protected
+    by `CLIENT_ALERT_RUN_SECRET`, and defaults to `dryRun: true`.
+  - First production cron observation should inspect Vercel Cron logs and alert
+    history after the scheduled run before increasing cadence or batch size.
   - Deployed runner smoke test passed:
     - `CLIENT_ALERT_RUN_SECRET` was configured in Vercel.
     - Dry run returned one eligible Immediate-frequency client and sent no

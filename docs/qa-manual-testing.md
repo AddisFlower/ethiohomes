@@ -218,20 +218,26 @@ Use a non-owner visitor or agent for each test.
 
 ## Scheduled Listing Alert Runner
 
-1. Set `CLIENT_ALERT_RUN_SECRET` locally and in Vercel.
-2. Ensure at least one client has alerts enabled, consent recorded, a valid
+1. Set `CLIENT_ALERT_RUN_SECRET` locally and in Vercel for manual runner tests.
+2. Set `CRON_SECRET` in Vercel for scheduled Cron invocations. Use a long
+   random value. Vercel sends it as `Authorization: Bearer CRON_SECRET`.
+3. Ensure at least one client has alerts enabled, consent recorded, a valid
    email, and unsent matching listings.
-3. Call `POST /api/client-alerts/run` with
+4. Call `POST /api/client-alerts/run` with
    `Authorization: Bearer CLIENT_ALERT_RUN_SECRET` and body
    `{ "dryRun": true, "limit": 2 }`.
-4. Expected: the response lists candidate clients and match counts without
+5. Expected: the response lists candidate clients and match counts without
    sending email or writing alert history.
-5. Call the same route with `{ "dryRun": false, "limit": 1 }` using a
+6. Call the same route with `{ "dryRun": false, "limit": 1 }` using a
    tester-controlled client email only.
-6. Expected: at most one client receives an alert email, send history is
+7. Expected: at most one client receives an alert email, send history is
    recorded, and matching listings are not resent on the next dry run.
-7. Confirm unsubscribed clients, Off-frequency clients, and recently checked
+8. Confirm unsubscribed clients, Off-frequency clients, and recently checked
    Daily/Weekly clients are skipped.
+9. After deployment, confirm Vercel lists one Cron Job for
+   `/api/client-alerts/run` with schedule `0 13 * * *`.
+10. Use Vercel's Cron Job logs after the first scheduled run to confirm the
+   route returns `200` or `207` and records the expected alert history.
 
 ## Public Lead Form Abuse Controls
 

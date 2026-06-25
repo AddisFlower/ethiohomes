@@ -85,7 +85,10 @@ vi.mock("@/lib/profiles", () => ({
 }));
 
 import { PATCH as updateApproval } from "@/app/api/admin/listings/[id]/approval/route";
-import { POST as runClientAlerts } from "@/app/api/client-alerts/run/route";
+import {
+  GET as runClientAlertsCron,
+  POST as runClientAlerts,
+} from "@/app/api/client-alerts/run/route";
 import { POST as sendClientAlert } from "@/app/api/client-alerts/send/route";
 import { POST as unsubscribeClientAlert } from "@/app/api/client-alerts/unsubscribe/route";
 import { POST as createAgentClient } from "@/app/api/clients/route";
@@ -111,6 +114,7 @@ const clientRouteContext = {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("protected listing route authorization", () => {
@@ -408,6 +412,46 @@ describe("scheduled client alert run route", () => {
       expect.objectContaining({
         dryRun: false,
         limit: 3,
+      })
+    );
+  });
+
+  it("requires Vercel's cron secret for scheduled GET runs", async () => {
+    vi.stubEnv("CRON_SECRET", "cron-secret");
+
+    const response = await runClientAlertsCron(
+      new Request("http://localhost/api/client-alerts/run", {
+        method: "GET",
+        headers: {
+          Authorization: "Bearer wrong-secret",
+        },
+      })
+    );
+
+    expect(response.status).toBe(401);
+    expect(mocks.runScheduledClientAlerts).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({
+      error: "Invalid cron secret.",
+    });
+  });
+
+  it("runs scheduled GET invocations as live batches", async () => {
+    vi.stubEnv("CRON_SECRET", "cron-secret");
+
+    const response = await runClientAlertsCron(
+      new Request("http://localhost/api/client-alerts/run", {
+        method: "GET",
+        headers: {
+          Authorization: "Bearer cron-secret",
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.runScheduledClientAlerts).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dryRun: false,
+        siteUrl: "http://localhost",
       })
     );
   });

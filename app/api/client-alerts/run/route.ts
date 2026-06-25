@@ -21,21 +21,53 @@ function getSecret(request: Request) {
   return request.headers.get("x-client-alert-run-secret");
 }
 
-export async function POST(request: Request) {
+function getCronSecret() {
+  return process.env.CRON_SECRET?.trim() ?? "";
+}
+
+function assertCronSecret(request: Request) {
+  const expectedSecret = getCronSecret();
+  const authorization = request.headers.get("authorization") ?? "";
+
+  if (!expectedSecret) {
+    throw new Error("CRON_SECRET is not configured.");
+  }
+
+  if (authorization !== `Bearer ${expectedSecret}`) {
+    throw new Error("Invalid cron secret.");
+  }
+}
+
+function getErrorStatus(message: string) {
+  return message.includes("secret") ? 401 : 500;
+}
+
+async function handleClientAlertRun({
+  request,
+  dryRun,
+  limit,
+}: {
+  request: Request;
+  dryRun: boolean;
+  limit?: unknown;
+}) {
+  const result = await runScheduledClientAlerts({
+    dryRun,
+    limit,
+    siteUrl: getSiteUrl(request),
+  });
+
+  return NextResponse.json(result, { status: result.ok ? 200 : 207 });
+}
+
+export async function GET(request: Request) {
   try {
-    assertClientAlertRunSecret(getSecret(request));
+    assertCronSecret(request);
 
-    const body = (await request.json().catch(() => ({}))) as {
-      dryRun?: boolean;
-      limit?: unknown;
-    };
-    const result = await runScheduledClientAlerts({
-      dryRun: body.dryRun !== false,
-      limit: body.limit,
-      siteUrl: getSiteUrl(request),
+    return await handleClientAlertRun({
+      request,
+      dryRun: false,
     });
-
-    return NextResponse.json(result, { status: result.ok ? 200 : 207 });
   } catch (error) {
     const message =
       error instanceof Error
@@ -47,7 +79,38 @@ export async function POST(request: Request) {
         error: message,
       },
       {
-        status: message.includes("secret") ? 401 : 500,
+        status: getErrorStatus(message),
+      }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    assertClientAlertRunSecret(getSecret(request));
+
+    const body = (await request.json().catch(() => ({}))) as {
+      dryRun?: boolean;
+      limit?: unknown;
+    };
+
+    return await handleClientAlertRun({
+      request,
+      dryRun: body.dryRun !== false,
+      limit: body.limit,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unable to run listing alerts.";
+
+    return NextResponse.json(
+      {
+        error: message,
+      },
+      {
+        status: getErrorStatus(message),
       }
     );
   }
