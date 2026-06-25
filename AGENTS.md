@@ -956,6 +956,10 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
     existing alert unsubscribe link.
   - Vercel Cron is configured in `vercel.json` to invoke
     `/api/client-alerts/run` daily at `0 13 * * *` UTC.
+  - Current Vercel Hobby-plan cadence means `Immediate` alerts are still only
+    checked once per day. If the project moves off Vercel Hobby or uses an
+    external scheduler, change the cron cadence so `Immediate` clients can be
+    checked hourly while `Daily` and `Weekly` remain rate-limited by the runner.
   - Vercel Cron uses `GET /api/client-alerts/run`, protected by `CRON_SECRET`
     through the Vercel-provided `Authorization: Bearer ...` header.
   - Manual runner testing still uses `POST /api/client-alerts/run`, protected
