@@ -35,6 +35,9 @@ describe("RLS policy migration contract", () => {
     expect(policies).toMatch(
       /alter table public\.showing_requests enable row level security/i
     );
+    expect(policies).toMatch(
+      /alter table public\.seller_leads enable row level security/i
+    );
   });
 
   it("uses security-definer profile role helpers without recursive policies", () => {
@@ -166,6 +169,19 @@ describe("RLS policy migration contract", () => {
     expect(schema).toContain("agent_clients_alert_consent_check");
   });
 
+  it("adds private seller lead storage for the public sell flow", () => {
+    expect(schema).toContain("create table if not exists public.seller_leads");
+    expect(schema).toContain("property_address text not null");
+    expect(schema).toContain("assigned_agent_id uuid references public.profiles(id)");
+    expect(schema).toContain("seller_leads_status_check");
+    expect(policies).toMatch(
+      /grant select, insert, update, delete on public\.seller_leads to service_role/i
+    );
+    expect(policies).not.toMatch(
+      /grant .* on public\.seller_leads to anon/i
+    );
+  });
+
   it("limits listing image uploads to authenticated users' own storage folder", () => {
     expect(policies).toMatch(
       /policy listing_images_select_public[\s\S]*on storage\.objects[\s\S]*bucket_id = 'listing-images'/i
@@ -217,6 +233,9 @@ describe("RLS rollback contract", () => {
     );
     expect(rollback).toMatch(
       /alter table public\.showing_requests disable row level security/i
+    );
+    expect(rollback).toMatch(
+      /alter table public\.seller_leads disable row level security/i
     );
   });
 

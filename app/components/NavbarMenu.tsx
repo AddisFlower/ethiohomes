@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 type MenuName = "search" | "listings" | "clients" | "account";
 
 type NavbarMenuProps = {
+  adminSellerLeadCount: number;
+  assignedSellerLeadCount: number;
   canUseAdmin: boolean;
   canUseAgent: boolean;
   displayName: string;
@@ -13,6 +15,8 @@ type NavbarMenuProps = {
 };
 
 export default function NavbarMenu({
+  adminSellerLeadCount,
+  assignedSellerLeadCount,
   canUseAdmin,
   canUseAgent,
   displayName,
@@ -20,6 +24,11 @@ export default function NavbarMenu({
 }: NavbarMenuProps) {
   const [openMenu, setOpenMenu] = useState<MenuName | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [hasDismissedAssignedSellerLeadBadge, setHasDismissedAssignedSellerLeadBadge] =
+    useState(false);
+  const visibleAssignedSellerLeadCount = hasDismissedAssignedSellerLeadBadge
+    ? 0
+    : assignedSellerLeadCount;
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -59,6 +68,11 @@ export default function NavbarMenu({
     setIsMobileMenuOpen(false);
   }
 
+  function openSellerLeads() {
+    setHasDismissedAssignedSellerLeadBadge(true);
+    closeMenu();
+  }
+
   function openDesktopMenu(menu: MenuName) {
     setOpenMenu(menu);
   }
@@ -71,6 +85,12 @@ export default function NavbarMenu({
 
   const dropdownClass =
     "absolute left-0 top-full z-50 mt-0 w-72 max-w-[calc(100vw-2rem)] rounded-lg border-2 border-emerald-700 bg-white p-5 shadow-xl";
+  const countBadge = (count: number) =>
+    count > 0 ? (
+      <span className="ml-2 rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+        {count}
+      </span>
+    ) : null;
 
   return (
     <nav className="border-b border-emerald-600 bg-white shadow-sm">
@@ -192,23 +212,41 @@ export default function NavbarMenu({
                     >
                       Manage Listings
                     </Link>
-                    <Link
-                      href="/showing-requests"
-                      onClick={closeMenu}
-                      className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
-                    >
-                      Showing Requests
-                    </Link>
-                  </>
-                )}
-                {canUseAdmin && (
                   <Link
-                    href="/admin"
+                    href="/showing-requests"
                     onClick={closeMenu}
                     className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
                   >
-                    Admin Review
+                    Showing Requests
                   </Link>
+                  <Link
+                    href="/seller-leads"
+                    onClick={openSellerLeads}
+                    className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Seller Leads
+                    {countBadge(visibleAssignedSellerLeadCount)}
+                  </Link>
+                </>
+              )}
+                {canUseAdmin && (
+                  <>
+                    <Link
+                      href="/admin"
+                      onClick={closeMenu}
+                      className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
+                    >
+                      Admin Review
+                    </Link>
+                    <Link
+                      href="/admin/seller-leads"
+                      onClick={closeMenu}
+                      className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
+                    >
+                      Seller Leads
+                      {countBadge(adminSellerLeadCount)}
+                    </Link>
+                  </>
                 )}
               </div>
             </div>
@@ -225,6 +263,14 @@ export default function NavbarMenu({
                     className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
                   >
                     Client Leads
+                  </Link>
+                  <Link
+                    href="/seller-leads"
+                    onClick={openSellerLeads}
+                    className="rounded-lg px-3 py-2 font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Seller Leads
+                    {countBadge(visibleAssignedSellerLeadCount)}
                   </Link>
                   <Link
                     href="/clients"
@@ -265,7 +311,7 @@ export default function NavbarMenu({
                   onClick={closeMenu}
                   className="flex w-full items-center justify-center rounded-lg bg-emerald-700 px-4 py-3 font-semibold text-white transition hover:bg-emerald-800"
                 >
-                  Sign In
+                  Join Us / Sign In
                 </Link>
               ) : (
                 <div className="grid gap-2">
@@ -397,6 +443,10 @@ export default function NavbarMenu({
                       <Link href="/showing-requests" onClick={closeMenu}>
                         Showing Requests
                       </Link>
+                      <Link href="/seller-leads" onClick={openSellerLeads}>
+                        Seller Leads
+                        {countBadge(visibleAssignedSellerLeadCount)}
+                      </Link>
                     </>
                   )}
                 </div>
@@ -418,6 +468,7 @@ export default function NavbarMenu({
                   className="font-semibold text-gray-800 transition hover:text-emerald-700"
                 >
                   Clients
+                  {countBadge(visibleAssignedSellerLeadCount)}
                 </button>
 
                 <div
@@ -429,6 +480,10 @@ export default function NavbarMenu({
                   <div className="flex flex-col gap-3 text-gray-700">
                     <Link href="/showing-requests" onClick={closeMenu}>
                       Client Leads
+                    </Link>
+                    <Link href="/seller-leads" onClick={openSellerLeads}>
+                      Seller Leads
+                      {countBadge(visibleAssignedSellerLeadCount)}
                     </Link>
                     <Link href="/clients" onClick={closeMenu}>
                       Client List
@@ -454,6 +509,7 @@ export default function NavbarMenu({
                 className="font-semibold text-gray-800 transition hover:text-emerald-700"
               >
                 Admin
+                {countBadge(adminSellerLeadCount)}
               </Link>
             )}
           </div>
@@ -465,7 +521,7 @@ export default function NavbarMenu({
                 onClick={closeMenu}
                 className="rounded-full border border-emerald-700 px-4 py-2 font-semibold text-emerald-700 transition hover:bg-emerald-100"
               >
-                Sign In
+                Join Us / Sign In
               </Link>
             ) : (
               <div
@@ -514,9 +570,15 @@ export default function NavbarMenu({
                       </>
                     )}
                     {canUseAdmin && (
-                      <Link href="/admin" onClick={closeMenu}>
-                        Admin Review
-                      </Link>
+                      <>
+                        <Link href="/admin" onClick={closeMenu}>
+                          Admin Review
+                        </Link>
+                        <Link href="/admin/seller-leads" onClick={closeMenu}>
+                          Seller Leads
+                          {countBadge(adminSellerLeadCount)}
+                        </Link>
+                      </>
                     )}
                     <form action="/api/auth/logout" method="post">
                       <button

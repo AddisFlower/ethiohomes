@@ -146,6 +146,7 @@ alter table public.profiles enable row level security;
 alter table public.listings enable row level security;
 alter table public.showing_requests enable row level security;
 alter table public.agent_clients enable row level security;
+alter table public.seller_leads enable row level security;
 alter table public.client_alert_sends enable row level security;
 
 drop policy if exists profiles_select_own on public.profiles;
@@ -383,6 +384,7 @@ grant select, insert, update, delete on public.profiles to service_role;
 grant select, insert, update, delete on public.listings to service_role;
 grant select, insert, update, delete on public.showing_requests to service_role;
 grant select, insert, update, delete on public.agent_clients to service_role;
+grant select, insert, update, delete on public.seller_leads to service_role;
 grant select, insert, update, delete on public.client_alert_sends to service_role;
 grant usage, select on sequence public.listing_id_seq to service_role;
 
@@ -398,6 +400,7 @@ commit;
 --     'listings',
 --     'showing_requests',
 --     'agent_clients',
+--     'seller_leads',
 --     'client_alert_sends'
 --   )
 -- order by tablename, policyname;
@@ -416,6 +419,7 @@ commit;
 --   'public.listings'::regclass,
 --   'public.showing_requests'::regclass,
 --   'public.agent_clients'::regclass,
+--   'public.seller_leads'::regclass,
 --   'public.client_alert_sends'::regclass
 -- )
 -- order by relname;

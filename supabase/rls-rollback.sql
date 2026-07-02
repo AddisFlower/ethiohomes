@@ -32,6 +32,7 @@ drop policy if exists profiles_select_own on public.profiles;
 
 alter table public.showing_requests disable row level security;
 alter table public.agent_clients disable row level security;
+alter table public.seller_leads disable row level security;
 alter table public.client_alert_sends disable row level security;
 alter table public.listings disable row level security;
 alter table public.profiles disable row level security;

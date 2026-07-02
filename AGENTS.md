@@ -26,6 +26,9 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
   - `DELETE /api/listings/[id]` deletes listings.
   - `PUT /api/listings/[id]/photo` replaces a listing's primary photo.
   - `POST /api/showing-requests` stores public showing requests/inquiries.
+  - `POST /api/seller-leads` stores public seller intake requests.
+  - `PATCH /api/admin/seller-leads/[id]/assignment` assigns seller leads to
+    agent/admin profiles through role-checked admin access.
   - `PATCH /api/admin/listings/[id]/approval` approves or rejects listings through role-checked admin access.
 - Reads are routed through `lib/listings.ts`:
   - Home promoted listings.
@@ -113,6 +116,15 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
   users do not need read access to private lead rows.
 - Agent profiles include an optional `public_contact_email`; showing-request
   confirmations no longer expose the agent's Supabase Auth login email.
+- The home Sell tab routes public sellers to `/sell` with the entered address
+  prefilled. Seller intake stores private `seller_leads` rows and does not
+  create public listings.
+- Admins can review seller leads on `/admin/seller-leads` and assign a lead to
+  an agent/admin profile. Assigned leads store `assigned_agent_id` and move to
+  `Assigned`.
+- Assigned agents can review their assigned seller leads on `/seller-leads`.
+  Navbar badges show admins the count of new unassigned seller leads and show
+  agents the count of assigned seller leads they have not opened yet.
 
 ## Supabase Integration Status
 - Supabase/Postgres is the active persistence layer for listings.
@@ -235,6 +247,25 @@ Important columns:
 - `status text not null default 'New'`
 - `created_at timestamptz`
 
+Table: `public.seller_leads`
+
+Important columns:
+- `id text primary key` - app-generated seller lead identity.
+- `property_address text not null` - address or neighborhood from the Sell flow.
+- `property_type text`
+- `intent text` - seller goal such as sell, rent out, or unsure.
+- `seller_name text not null`
+- `seller_phone text not null`
+- `seller_email text`
+- `preferred_contact_method text`
+- `notes text`
+- `status text not null default 'New'`
+- `assigned_agent_id uuid references public.profiles(id) on delete set null`
+- `agent_viewed_at timestamptz` - set when the assigned agent opens
+  `/seller-leads`, clearing the assigned-lead badge.
+- `created_at timestamptz`
+- `updated_at timestamptz`
+
 Indexes:
 - `owner_id`
 - `status`
@@ -242,6 +273,9 @@ Indexes:
 - `showing_requests.agent_owner_id`
 - `showing_requests.listing_id`
 - `showing_requests.created_at`
+- `seller_leads.status`
+- `seller_leads.assigned_agent_id`
+- `seller_leads.created_at`
 
 Trigger:
 - Updates `updated_at` automatically before row updates.
@@ -293,6 +327,22 @@ Seed data:
     and requested showing are no longer available. Notification must happen
     before the cascade delete and requires deliberate email infrastructure,
     retry handling, and privacy/retention rules.
+- Seller leads:
+  - Public sellers can enter an address from the home Sell tab and complete
+    `/sell` intake.
+  - Seller intake creates private `public.seller_leads` rows through the
+    service-role server route.
+  - Seller leads do not create `public.listings` rows and are not publicly
+    browseable.
+  - Admins can assign seller leads to an agent/admin profile from
+    `/admin/seller-leads`.
+  - Assigned agents can view their own seller leads from `/seller-leads`.
+  - Notifications are currently navbar count badges, not real-time push or
+    email notifications.
+  - Agent seller-lead badges count assigned leads with `agent_viewed_at is null`
+    and clear when the agent opens `/seller-leads`.
+  - Coverage-area matching and public phone/WhatsApp/Telegram profile fields are
+    not implemented yet.
 - Admins can approve or reject listings through `/admin`.
 - Admins can filter and review Unapproved, Approved, Rejected, and All listings.
 - Admin rejection requires a reason.
@@ -553,6 +603,8 @@ Recommended next implementation slice:
 - Photo management supports one primary image only; galleries and ordering are future work.
 - Save Listing is hidden. Restore it only with client accounts and persistent favorites; do not add a browser-local success state.
 - Showing request status is currently always `New`; this is acceptable for MVP/internal demos, but a follow-up workflow will be valuable after client accounts.
+- Seller lead status starts as `New`; admin assignment changes it to `Assigned`.
+  More agent-facing status management is future work.
 - Admin access uses `public.profiles.role` in both application authorization
   and RLS role helpers.
 - `verified` remains a supporting database flag and should not be treated as the primary UI state.

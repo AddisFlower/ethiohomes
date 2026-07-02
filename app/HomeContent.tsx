@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation";
 import type { Property } from "@/lib/listings";
 import { canViewFullComingSoonDetails } from "@/lib/listing-rules";
 
+type SearchTab = "buy" | "sell" | "rent";
+
 type HomeContentProps = {
   properties: Property[];
   isAgent: boolean;
@@ -26,9 +28,19 @@ export default function HomeContent({
   unapprovedListingsCount,
 }: HomeContentProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [listingPreset, setListingPreset] = useState("ALL");
-  const [propertyType, setPropertyType] = useState("ALL");
+  const [activeSearchTab, setActiveSearchTab] = useState<SearchTab>("buy");
   const router = useRouter();
+  const showHomeDashboardSections = false;
+  const searchTabLabels: Record<SearchTab, string> = {
+    buy: "Buy",
+    sell: "Sell",
+    rent: "Rent",
+  };
+  const searchPlaceholders: Record<SearchTab, string> = {
+    buy: "Search homes, land, or commercial properties for sale...",
+    sell: "Search your city or neighborhood...",
+    rent: "Search homes, apartments, or offices for rent...",
+  };
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -37,155 +49,91 @@ export default function HomeContent({
     const params = new URLSearchParams();
 
     if (query) {
-      params.set("search", query);
+      params.set(activeSearchTab === "sell" ? "address" : "search", query);
     }
 
-    if (propertyType !== "ALL") {
-      params.set("propertyType", propertyType);
-    }
-
-    if (listingPreset === "RESIDENTIAL_SALE") {
-      params.set("category", "Residential");
+    if (activeSearchTab === "buy") {
       params.set("transactionType", "For Sale");
-    } else if (listingPreset === "RESIDENTIAL_RENT") {
-      params.set("category", "Residential");
+    } else if (activeSearchTab === "rent") {
       params.set("transactionType", "For Rent");
-    } else if (listingPreset === "COMMERCIAL_SALE") {
-      params.set("category", "Commercial");
-      params.set("transactionType", "For Sale");
-    } else if (listingPreset === "COMMERCIAL_RENT") {
-      params.set("category", "Commercial");
-      params.set("transactionType", "For Rent");
-    } else if (listingPreset !== "ALL") {
-      params.set("propertyType", listingPreset);
     }
 
     const queryString = params.toString();
+    if (activeSearchTab === "sell") {
+      router.push(queryString ? `/sell?${queryString}` : "/sell");
+      return;
+    }
+
     router.push(queryString ? `/listings?${queryString}` : "/listings");
   }
 
   return (
     <main className="min-h-screen bg-gray-100">
       {/* HERO SECTION */}
-      <section className="bg-gradient-to-r from-slate-900 to-black text-white py-15 px-6">
-        <div className="max-w-6xl mx-auto">
+      <section className="relative overflow-hidden px-6 py-36 text-white">
+        <Image
+          src="/addis-ababa-hero.png"
+          alt="Addis Ababa skyline"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-black/45" />
+
+        <div className="relative z-10 max-w-6xl mx-auto">
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
             {isAgent || isAdmin
               ? "Agent Dashboard"
               : "Browse Ethiopian Real Estate"}
           </h1>
 
-          <p className="text-lg text-gray-500 max-w-2xl mb-6">
+          <p className="text-lg text-white/85 max-w-2xl mb-6">
             {isAgent || isAdmin
               ? "Manage listings, review activity, and keep your properties moving."
               : "Search listings, compare properties, and connect with verified agents."}
           </p>
 
           <form onSubmit={handleSearchSubmit}>
+            <div className="mb-3 flex w-fit rounded-lg bg-white/15 p-1 backdrop-blur">
+              {(Object.keys(searchTabLabels) as SearchTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveSearchTab(tab)}
+                  className={`rounded-md px-5 py-2 text-sm font-semibold transition ${
+                    activeSearchTab === tab
+                      ? "bg-white text-black shadow"
+                      : "text-white hover:bg-white/15"
+                  }`}
+                >
+                  {searchTabLabels[tab]}
+                </button>
+              ))}
+            </div>
+
             <div className="flex flex-col md:flex-row gap-4">
               <input
                 type="text"
-                placeholder="Search by city, neighborhood, or title..."
+                placeholder={searchPlaceholders[activeSearchTab]}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                className="flex-1 px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                className="flex-1 px-4 py-3 rounded-lg border border-white/40 bg-white/90 text-black placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-
-              <select
-                value={listingPreset}
-                onChange={(event) => setListingPreset(event.target.value)}
-                className="px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700"
-              >
-                <option value="ALL" className="bg-white text-black">
-                  All Listings
-                </option>
-                <option
-                  value="RESIDENTIAL_SALE"
-                  className="bg-white text-black"
-                >
-                  Residential Sale
-                </option>
-                <option
-                  value="RESIDENTIAL_RENT"
-                  className="bg-white text-black"
-                >
-                  Residential Rent
-                </option>
-                <option value="Multi-Family" className="bg-white text-black">
-                  Multi-Family
-                </option>
-                <option value="Land" className="bg-white text-black">
-                  Land
-                </option>
-                <option
-                  value="COMMERCIAL_SALE"
-                  className="bg-white text-black"
-                >
-                  Commercial Sale
-                </option>
-                <option
-                  value="COMMERCIAL_RENT"
-                  className="bg-white text-black"
-                >
-                  Commercial Rent
-                </option>
-              </select>
-
-              <select
-                value={propertyType}
-                onChange={(event) => setPropertyType(event.target.value)}
-                className="px-4 py-3 rounded-lg text-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-700"
-              >
-                <option value="ALL" className="bg-white text-black">
-                  All Property Types
-                </option>
-                <option value="Apartment" className="bg-white text-black">
-                  Apartment
-                </option>
-                <option value="Villa" className="bg-white text-black">
-                  Villa
-                </option>
-                <option value="Condo" className="bg-white text-black">
-                  Condo
-                </option>
-                <option value="Office" className="bg-white text-black">
-                  Office
-                </option>
-                <option value="Land" className="bg-white text-black">
-                  Land
-                </option>
-              </select>
 
               <button
                 type="submit"
                 className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-3 rounded-lg transition"
               >
-                Search
+                {activeSearchTab === "sell" ? "Get Matched" : "Search"}
               </button>
             </div>
           </form>
 
-          {!isAgent && !isAdmin && (
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-5 py-3 rounded-lg transition"
-              >
-                Sign In
-              </Link>
-
-              <Link
-                href="/signup"
-                className="inline-flex items-center justify-center border border-white/30 text-white font-semibold px-5 py-3 rounded-lg hover:bg-white/10 transition"
-              >
-                Create Agent Account
-              </Link>
-            </div>
-          )}
         </div>
       </section>
 
-      {(isAgent || isAdmin) && (
+      {showHomeDashboardSections && (isAgent || isAdmin) && (
         <section className="max-w-6xl mx-auto py-12 px-6">
           <h2 className="text-3xl font-bold text-black mb-2">
             {isAdmin ? "Admin and Agent Workspace" : "Agent Dashboard"}
@@ -263,7 +211,7 @@ export default function HomeContent({
         </section>
       )}
 
-      {!isAgent && !isAdmin && (
+      {showHomeDashboardSections && !isAgent && !isAdmin && (
         <section className="max-w-6xl mx-auto py-12 px-6">
           <h2 className="text-3xl font-bold text-black mb-2">
             Start Searching

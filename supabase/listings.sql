@@ -82,6 +82,23 @@ create table if not exists public.agent_clients (
   unique (id, owner_id)
 );
 
+create table if not exists public.seller_leads (
+  id text primary key,
+  property_address text not null,
+  property_type text,
+  intent text,
+  seller_name text not null,
+  seller_phone text not null,
+  seller_email text,
+  preferred_contact_method text,
+  notes text,
+  status text not null default 'New',
+  assigned_agent_id uuid references public.profiles(id) on delete set null,
+  agent_viewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 do $$
 begin
   if not exists (
@@ -270,6 +287,9 @@ create index if not exists agent_clients_owner_id_idx on public.agent_clients(ow
 create index if not exists agent_clients_status_idx on public.agent_clients(status);
 create index if not exists agent_clients_next_follow_up_at_idx on public.agent_clients(next_follow_up_at);
 create index if not exists agent_clients_alert_enabled_idx on public.agent_clients(alert_enabled);
+create index if not exists seller_leads_status_idx on public.seller_leads(status);
+create index if not exists seller_leads_assigned_agent_id_idx on public.seller_leads(assigned_agent_id);
+create index if not exists seller_leads_created_at_idx on public.seller_leads(created_at);
 create index if not exists client_alert_sends_agent_owner_id_idx on public.client_alert_sends(agent_owner_id);
 create index if not exists client_alert_sends_agent_client_id_idx on public.client_alert_sends(agent_client_id);
 create index if not exists client_alert_sends_listing_id_idx on public.client_alert_sends(listing_id);
@@ -289,6 +309,9 @@ add column if not exists alert_unsubscribed_at timestamptz;
 
 alter table public.agent_clients
 add column if not exists alert_unsubscribe_token text;
+
+alter table public.seller_leads
+add column if not exists agent_viewed_at timestamptz;
 
 update public.agent_clients
 set alert_unsubscribe_token = md5(random()::text || clock_timestamp()::text)
@@ -364,6 +387,31 @@ begin
   if not exists (
     select 1
     from pg_constraint
+    where conname = 'seller_leads_status_check'
+      and conrelid = 'public.seller_leads'::regclass
+  ) then
+    alter table public.seller_leads
+    add constraint seller_leads_status_check
+    check (status in ('New', 'Contacted', 'Assigned', 'Closed'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'seller_leads_seller_email_check'
+      and conrelid = 'public.seller_leads'::regclass
+  ) then
+    alter table public.seller_leads
+    add constraint seller_leads_seller_email_check
+    check (
+      seller_email is null
+      or seller_email ~* '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
+    );
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
     where conname = 'client_alert_sends_status_check'
       and conrelid = 'public.client_alert_sends'::regclass
   ) then
@@ -403,6 +451,21 @@ create trigger agent_clients_set_updated_at
 before update on public.agent_clients
 for each row
 execute function public.set_agent_clients_updated_at();
+
+create or replace function public.set_seller_leads_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists seller_leads_set_updated_at on public.seller_leads;
+
+create trigger seller_leads_set_updated_at
+before update on public.seller_leads
+for each row
+execute function public.set_seller_leads_updated_at();
 
 select setval(
   'public.listing_id_seq',
