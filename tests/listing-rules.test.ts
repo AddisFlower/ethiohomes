@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canAgentBrowseListing,
+  canViewFullComingSoonDetails,
   canViewerBrowseListing,
   getShowingEligibility,
   isPubliclyVisibleListing,
@@ -115,6 +116,26 @@ describe("listing visibility policies", () => {
     expect(canViewerBrowseListing(hiddenListing, "admin", authUser.id)).toBe(
       true
     );
+  });
+});
+
+describe("coming soon detail access", () => {
+  it("limits full Coming Soon details to signed-in agents and admins", () => {
+    const listing = createListingFixture({ marketStatus: "Coming Soon" });
+
+    expect(canViewFullComingSoonDetails(listing, "public")).toBe(false);
+    expect(canViewFullComingSoonDetails(listing, "incomplete")).toBe(false);
+    expect(canViewFullComingSoonDetails(listing, "agent")).toBe(true);
+    expect(canViewFullComingSoonDetails(listing, "admin")).toBe(true);
+  });
+
+  it("does not restrict full details for non-Coming-Soon public listings", () => {
+    expect(
+      canViewFullComingSoonDetails(
+        createListingFixture({ marketStatus: "Active" }),
+        "public"
+      )
+    ).toBe(true);
   });
 });
 

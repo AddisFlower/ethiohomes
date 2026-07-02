@@ -39,6 +39,7 @@ export default async function ListingsPage({
         key={filterKey}
         properties={properties}
         currentUserId={currentUserId}
+        viewerRole={session.role}
       />
     </Suspense>
   );

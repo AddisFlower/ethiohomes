@@ -299,6 +299,8 @@ Seed data:
 - Editing a rejected listing resubmits it by setting `approval_status = Unapproved` and clearing `rejection_reason`.
 - Public browse/detail shows only `approval_status = Approved` listings with `market_status` in `Coming Soon`, `Active`, `Under Contract`, or `Closed`.
 - Public browse/detail hides Unapproved listings, Rejected listings, and Off Market listings.
+- Public visitors can discover Approved + Coming Soon listings but only see a
+  preview. Full Coming Soon details are reserved for signed-in agents/admins.
 - Authenticated agents can browse public-visible listings plus Approved + Off
   Market listings from other agents.
 - Unapproved and Rejected listings are hidden from unrelated agents regardless

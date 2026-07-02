@@ -6,6 +6,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Property } from "@/lib/listings";
+import { canViewFullComingSoonDetails } from "@/lib/listing-rules";
 
 type HomeContentProps = {
   properties: Property[];
@@ -322,77 +323,96 @@ export default function HomeContent({
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {properties.map((property) => (
-            <div
-              key={property.id}
-              className="bg-white rounded-xl overflow-hidden shadow-lg hover:scale-105 transition duration-300"
-            >
-              <div className="relative h-56 w-full">
-                <Image
-                  src={property.image}
-                  alt={property.title}
-                  fill
-                  sizes="(min-width: 768px) 33vw, 100vw"
-                  className="object-cover"
-                />
-              </div>
+          {properties.map((property) => {
+            const canViewFullDetails = canViewFullComingSoonDetails(
+              property,
+              isAgent || isAdmin ? "agent" : "public"
+            );
 
-              <div className="p-5">
-                <div className="flex gap-2 mb-3">
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                      property.transactionType === "For Sale"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-blue-100 text-blue-700"
-                    }`}
-                  >
-                    {property.transactionType}
-                  </span>
-
-                  <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">
-                    {property.marketStatus}
-                  </span>
-
-                </div>
-                <h3 className="text-2xl font-semibold text-black mb-2">
-                  {property.title}
-                </h3>
-
-                <p className="text-green-700 font-bold text-lg mb-2">
-                  {property.price}
-                </p>
-
-                <p className="text-gray-600 mb-4">{property.location}</p>
-
-                <div className="mt-4 space-y-1 text-sm text-gray-600">
-                  <p>
-                    <span className="font-semibold text-black">
-                      Listing ID:
-                    </span>{" "}
-                    {property.listingId}
-                  </p>
-
-                  <p>
-                    <span className="font-semibold text-black">Agent:</span>{" "}
-                    {property.agent}
-                  </p>
-
-                  <p>
-                    <span className="font-semibold text-black">Market:</span>{" "}
-                    {property.marketStatus}
-                  </p>
-
-                  <p className="text-xs text-gray-500">{property.updatedAt}</p>
+            return (
+              <div
+                key={property.id}
+                className="bg-white rounded-xl overflow-hidden shadow-lg hover:scale-105 transition duration-300"
+              >
+                <div className="relative h-56 w-full">
+                  <Image
+                    src={property.image}
+                    alt={property.title}
+                    fill
+                    sizes="(min-width: 768px) 33vw, 100vw"
+                    className="object-cover"
+                  />
                 </div>
 
-                <Link href={`/listings/${property.id}`}>
-                  <button className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 cursor-pointer">
-                    View Details
-                  </button>
-                </Link>
+                <div className="p-5">
+                  <div className="flex gap-2 mb-3">
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                        property.transactionType === "For Sale"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {property.transactionType}
+                    </span>
+
+                    <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">
+                      {property.marketStatus}
+                    </span>
+                  </div>
+
+                  <h3 className="text-2xl font-semibold text-black mb-2">
+                    {property.title}
+                  </h3>
+
+                  <p className="text-green-700 font-bold text-lg mb-2">
+                    {canViewFullDetails
+                      ? property.price
+                      : "Price available to signed-in agents"}
+                  </p>
+
+                  <p className="text-gray-600 mb-4">{property.location}</p>
+
+                  {!canViewFullDetails && (
+                    <p className="mb-4 rounded-lg bg-yellow-50 px-3 py-2 text-sm text-yellow-900">
+                      Coming Soon preview. Sign in as an agent for full details.
+                    </p>
+                  )}
+
+                  <div className="mt-4 space-y-1 text-sm text-gray-600">
+                    <p>
+                      <span className="font-semibold text-black">
+                        Listing ID:
+                      </span>{" "}
+                      {property.listingId}
+                    </p>
+
+                    {canViewFullDetails && (
+                      <p>
+                        <span className="font-semibold text-black">Agent:</span>{" "}
+                        {property.agent}
+                      </p>
+                    )}
+
+                    <p>
+                      <span className="font-semibold text-black">Market:</span>{" "}
+                      {property.marketStatus}
+                    </p>
+
+                    <p className="text-xs text-gray-500">
+                      {property.updatedAt}
+                    </p>
+                  </div>
+
+                  <Link href={`/listings/${property.id}`}>
+                    <button className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 cursor-pointer">
+                      {canViewFullDetails ? "View Details" : "View Preview"}
+                    </button>
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </main>

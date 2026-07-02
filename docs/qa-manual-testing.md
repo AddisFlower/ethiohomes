@@ -29,6 +29,8 @@ Create or update listings covering every approval and market status combination.
 Sign out before each public test.
 
 1. Confirm Approved + Coming Soon appears in Browse and detail pages.
+   For signed-out visitors, confirm it is a preview with price, address,
+   agent, rooms, full description, and showing actions withheld.
 2. Confirm Approved + Active appears in Browse and detail pages.
 3. Confirm Approved + Under Contract appears in Browse and detail pages.
 4. Confirm Approved + Closed appears in Browse and detail pages.
@@ -46,6 +48,8 @@ Use two agent accounts, Agent A and Agent B.
 1. As Agent A, confirm all Agent A listings appear regardless of approval or market status.
 2. Confirm Agent A can open direct detail URLs for all owned listings.
 3. Confirm Agent A sees Agent B's publicly visible listings.
+   For Approved + Coming Soon listings, confirm full price, address, agent,
+   rooms, and description are visible to the signed-in agent.
 4. Confirm Agent A sees Agent B's Approved + Off Market listings.
 5. Confirm Agent A does not see Agent B's Unapproved or Rejected listings,
    including Off Market listings.

@@ -7,7 +7,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Property } from "@/lib/listings";
 import {
+  canViewFullComingSoonDetails,
   getShowingEligibility,
+  type ListingViewerRole,
   marketStatuses,
   propertyTypes,
 } from "@/lib/listing-rules";
@@ -15,11 +17,13 @@ import {
 type ListingsContentProps = {
   currentUserId: string | null;
   properties: Property[];
+  viewerRole: ListingViewerRole;
 };
 
 export default function ListingsContent({
   currentUserId,
   properties,
+  viewerRole,
 }: ListingsContentProps) {
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(
@@ -195,6 +199,10 @@ export default function ListingsContent({
           {filteredProperties.map((property) => {
             const isOwner = currentUserId === property.ownerId;
             const showingEligibility = getShowingEligibility(property);
+            const canViewFullDetails = canViewFullComingSoonDetails(
+              property,
+              viewerRole
+            );
 
             return (
               <div
@@ -229,10 +237,19 @@ export default function ListingsContent({
                   </h2>
 
                   <p className="text-green-700 font-bold text-lg mb-2">
-                    {property.price}
+                    {canViewFullDetails
+                      ? property.price
+                      : "Price available to signed-in agents"}
                   </p>
 
                   <p className="text-gray-600 mb-4">{property.location}</p>
+
+                  {!canViewFullDetails && (
+                    <p className="mb-4 rounded-lg bg-yellow-50 px-3 py-2 text-sm text-yellow-900">
+                      Coming Soon preview. Sign in as an agent to see full
+                      listing details.
+                    </p>
+                  )}
 
                   <div className="flex flex-wrap gap-2 mb-4">
                     <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
@@ -284,7 +301,7 @@ export default function ListingsContent({
 
                     <Link href={`/listings/${property.id}`}>
                       <button className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3 rounded-lg cursor-pointer transition">
-                        View Details
+                        {canViewFullDetails ? "View Details" : "View Preview"}
                       </button>
                     </Link>
 

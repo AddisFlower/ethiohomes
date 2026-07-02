@@ -34,6 +34,7 @@ export const propertyTypes = [
 export type ApprovalStatus = (typeof approvalStatuses)[number];
 export type MarketStatus = (typeof marketStatuses)[number];
 export type TransactionType = (typeof transactionTypes)[number];
+export type ListingViewerRole = "public" | "incomplete" | "agent" | "admin";
 
 const residentialPropertyTypes = new Set([
   "Apartment",
@@ -104,7 +105,7 @@ export function canViewerBrowseListing(
     marketStatus: string;
     ownerId: string;
   },
-  role: "public" | "incomplete" | "agent" | "admin",
+  role: ListingViewerRole,
   userId?: string
 ) {
   if (role === "admin") {
@@ -116,6 +117,17 @@ export function canViewerBrowseListing(
   }
 
   return isPubliclyVisibleListing(listing);
+}
+
+export function canViewFullComingSoonDetails(
+  listing: { marketStatus: string },
+  role: ListingViewerRole
+) {
+  return (
+    listing.marketStatus !== "Coming Soon" ||
+    role === "agent" ||
+    role === "admin"
+  );
 }
 
 export function getShowingEligibility(listing: {
