@@ -30,7 +30,7 @@ Sign out before each public test.
 
 1. Confirm Approved + Coming Soon appears in Browse and detail pages.
 2. Confirm Approved + Active appears in Browse and detail pages.
-3. Confirm Approved + Pending appears in Browse and detail pages.
+3. Confirm Approved + Under Contract appears in Browse and detail pages.
 4. Confirm Approved + Closed appears in Browse and detail pages.
 5. Confirm Approved + Off Market is absent and its direct detail URL is hidden.
 6. Confirm Unapproved listings are absent for every market status.
@@ -67,7 +67,7 @@ Use a non-owner visitor or agent for each test.
 1. Approved + Active: confirm Request Showing is available and submission succeeds.
 2. Confirm the success panel is prominent and includes Back to Browse Listings.
 3. Coming Soon: confirm the page says "Showings are not available yet."
-4. Pending: confirm showing requests are unavailable.
+4. Under Contract: confirm showing requests are unavailable.
 5. Closed: confirm showing requests are unavailable.
 6. Off Market: confirm showing requests are unavailable for authenticated viewers.
 7. Unapproved and Rejected owned listings: confirm showing requests are unavailable.
@@ -93,7 +93,7 @@ Use a non-owner visitor or agent for each test.
 ## Add Listing Validation
 
 1. Confirm market options are Coming Soon, Active, and Off Market only.
-2. Confirm Pending and Closed cannot be submitted by manually altering the request.
+2. Confirm Under Contract and Closed cannot be submitted by manually altering the request.
 3. For Apartment, Villa, House, Condo, and Multi-Family, confirm bedrooms and bathrooms are visible and required.
 4. Confirm the server rejects missing residential bedroom or bathroom values.
 5. For Land, confirm bedrooms and bathrooms are hidden and saved as null.
@@ -105,7 +105,7 @@ Use a non-owner visitor or agent for each test.
 
 ## Edit Listing Validation
 
-1. Confirm Edit includes Coming Soon, Active, Pending, Closed, and Off Market.
+1. Confirm Edit includes Coming Soon, Active, Under Contract, Closed, and Off Market.
 2. Repeat the property-type field tests from Add Listing.
 3. Confirm saving Land stores null bedrooms and bathrooms.
 4. Confirm the form disables while saving and the button reads Saving.

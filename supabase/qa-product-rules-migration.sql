@@ -19,12 +19,16 @@ where transaction_type is null
   or transaction_type not in ('For Sale', 'For Rent');
 
 update public.listings
+set market_status = 'Under Contract'
+where market_status = 'Pending';
+
+update public.listings
 set market_status = 'Active'
 where market_status is null
   or market_status not in (
     'Coming Soon',
     'Active',
-    'Pending',
+    'Under Contract',
     'Closed',
     'Off Market'
   );
@@ -69,24 +73,20 @@ begin
     check (transaction_type in ('For Sale', 'For Rent'));
   end if;
 
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'listings_market_status_check'
-      and conrelid = 'public.listings'::regclass
-  ) then
-    alter table public.listings
-    add constraint listings_market_status_check
-    check (
-      market_status in (
-        'Coming Soon',
-        'Active',
-        'Pending',
-        'Closed',
-        'Off Market'
-      )
-    );
-  end if;
+  alter table public.listings
+  drop constraint if exists listings_market_status_check;
+
+  alter table public.listings
+  add constraint listings_market_status_check
+  check (
+    market_status in (
+      'Coming Soon',
+      'Active',
+      'Under Contract',
+      'Closed',
+      'Off Market'
+    )
+  );
 
   if not exists (
     select 1

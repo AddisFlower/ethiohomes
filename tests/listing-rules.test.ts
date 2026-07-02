@@ -10,7 +10,7 @@ import { authUser, otherAuthUser } from "@/tests/fixtures/auth";
 import { createListingFixture } from "@/tests/fixtures/listings";
 
 describe("listing visibility policies", () => {
-  it.each(["Coming Soon", "Active", "Pending", "Closed"] as const)(
+  it.each(["Coming Soon", "Active", "Under Contract", "Closed"] as const)(
     "makes Approved + %s publicly visible",
     (marketStatus) => {
       expect(

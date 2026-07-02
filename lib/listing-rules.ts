@@ -7,7 +7,7 @@ export const approvalStatuses = [
 export const marketStatuses = [
   "Coming Soon",
   "Active",
-  "Pending",
+  "Under Contract",
   "Closed",
   "Off Market",
 ] as const;
@@ -76,7 +76,7 @@ export function isPubliclyVisibleListing(listing: {
 }) {
   return (
     listing.approvalStatus === "Approved" &&
-    ["Coming Soon", "Active", "Pending", "Closed"].includes(
+    ["Coming Soon", "Active", "Under Contract", "Closed"].includes(
       listing.marketStatus
     )
   );
@@ -136,10 +136,11 @@ export function getShowingEligibility(listing: {
     };
   }
 
-  if (listing.marketStatus === "Pending") {
+  if (listing.marketStatus === "Under Contract") {
     return {
       allowed: false,
-      message: "This listing is pending and is not accepting showing requests.",
+      message:
+        "This listing is under contract and is not accepting showing requests.",
     };
   }
 

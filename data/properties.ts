@@ -33,7 +33,7 @@ export const properties: Property[] = [
     location: "Addis Ababa, Summit",
     address: "Summit Figa, near Safari Apartments, Villa 18",
     transactionType: "For Rent",
-    marketStatus: "Pending",
+    marketStatus: "Under Contract",
     verified: true,
     bedrooms: 5,
     bathrooms: 4,

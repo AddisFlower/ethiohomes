@@ -176,7 +176,7 @@ for select
 to anon
 using (
   approval_status = 'Approved'
-  and market_status in ('Coming Soon', 'Active', 'Pending', 'Closed')
+  and market_status in ('Coming Soon', 'Active', 'Under Contract', 'Closed')
 );
 
 drop policy if exists listings_select_authenticated on public.listings;
@@ -187,7 +187,7 @@ to authenticated
 using (
   (
     approval_status = 'Approved'
-    and market_status in ('Coming Soon', 'Active', 'Pending', 'Closed')
+    and market_status in ('Coming Soon', 'Active', 'Under Contract', 'Closed')
   )
   or (
     (select ethiomls_private.is_agent_or_admin())

@@ -24,7 +24,7 @@ covering:
 
 - Approved + Active
 - Approved + Coming Soon
-- Approved + Pending
+- Approved + Under Contract
 - Approved + Closed
 - Approved + Off Market
 - Unapproved + Active
@@ -57,7 +57,7 @@ covering:
 ### Public
 
 1. Sign out.
-2. Confirm only Approved listings in Coming Soon, Active, Pending, or Closed
+2. Confirm only Approved listings in Coming Soon, Active, Under Contract, or Closed
    appear.
 3. Confirm direct URLs for Off Market, Unapproved, and Rejected listings return
    the not-found state.
@@ -168,7 +168,7 @@ Fixture requirements:
   `approval_status = Approved` and `verified = true`.
 - `RLS_AGENT_B_ACTIVE_LISTING_ID` must be Agent B's Approved + Active listing.
 - `RLS_INELIGIBLE_PUBLIC_LISTING_ID` must be public-readable but not eligible
-  for showings, such as Approved + Coming Soon, Pending, or Closed.
+  for showings, such as Approved + Coming Soon, Under Contract, or Closed.
 - If `SUPABASE_SERVICE_ROLE_KEY` is present, the script removes its disposable
   showing-request rows after the run. Without it, those disposable rows remain
   for manual cleanup.

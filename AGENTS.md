@@ -96,7 +96,7 @@ EthioMLS is an agent-facing MLS workspace for Ethiopian real estate professional
   are blocked for unsubscribed clients until the agent re-enables alerts.
 - Showing requests are limited to Approved + Active listings in both UI and server logic.
 - Residential room fields are required; Land stores null rooms; Commercial/Office use optional bathrooms and null bedrooms.
-- Add Listing excludes Pending and Closed; Edit Listing supports the full market lifecycle.
+- Add Listing excludes Under Contract and Closed; Edit Listing supports the full market lifecycle.
 - Edit Listing uses Manage Photos file upload instead of raw image URL editing.
 - Successful login redirects to the dashboard.
 - Navbar and home listing presets apply real Browse filters.
@@ -195,7 +195,7 @@ Important columns:
 - `property_type text not null`
 - `status text not null` - legacy transaction-type field kept temporarily for migration safety; app code ignores it.
 - `transaction_type text not null` - either `For Sale` or `For Rent`.
-- `market_status text not null` - `Coming Soon`, `Active`, `Pending`, `Closed`, or `Off Market`.
+- `market_status text not null` - `Coming Soon`, `Active`, `Under Contract`, `Closed`, or `Off Market`.
 - `verified boolean not null default false`
 - `bedrooms integer` - nullable when bedrooms do not apply.
 - `bathrooms integer` - nullable for Land and optional for Commercial/Office.
@@ -286,7 +286,7 @@ Seed data:
   - A contact lookup failure does not fail or duplicate the stored showing
     request.
   - Agents can manage the dedicated public contact email on `/profile`.
-  - Coming Soon, Pending, Closed, Off Market, Unapproved, and Rejected listings cannot receive showing requests.
+  - Coming Soon, Under Contract, Closed, Off Market, Unapproved, and Rejected listings cannot receive showing requests.
   - Email notifications are not implemented yet.
   - Deleting a listing cascades deletion to its showing requests.
   - TODO: Before production hard deletion, notify requesters that the listing
@@ -297,7 +297,7 @@ Seed data:
 - Admins can filter and review Unapproved, Approved, Rejected, and All listings.
 - Admin rejection requires a reason.
 - Editing a rejected listing resubmits it by setting `approval_status = Unapproved` and clearing `rejection_reason`.
-- Public browse/detail shows only `approval_status = Approved` listings with `market_status` in `Coming Soon`, `Active`, `Pending`, or `Closed`.
+- Public browse/detail shows only `approval_status = Approved` listings with `market_status` in `Coming Soon`, `Active`, `Under Contract`, or `Closed`.
 - Public browse/detail hides Unapproved listings, Rejected listings, and Off Market listings.
 - Authenticated agents can browse public-visible listings plus Approved + Off
   Market listings from other agents.
@@ -507,7 +507,7 @@ Current status:
 - MVP listing CRUD is Supabase-backed and Vercel build is passing.
 - Listing status model redesign is complete:
   - `approval_status`: `Unapproved`, `Approved`, `Rejected`.
-  - `market_status`: `Coming Soon`, `Active`, `Pending`, `Closed`, `Off Market`.
+  - `market_status`: `Coming Soon`, `Active`, `Under Contract`, `Closed`, `Off Market`.
   - `transaction_type`: `For Sale`, `For Rent`.
 - Public browse/detail visibility is approval/lifecycle filtered.
 - Supabase Auth email/password flows are implemented for agent/admin access.
@@ -763,7 +763,7 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
       and market statuses selected on the client alert filter.
     - Supported alert market statuses: `Coming Soon`, `Active`, and `Closed`.
     - Default alert market status filter: `Active`.
-    - Exclude `Pending`, `Off Market`, `Unapproved`, and `Rejected` from alert
+    - Exclude `Under Contract`, `Off Market`, `Unapproved`, and `Rejected` from alert
       emails.
     - Match against saved client criteria such as location, property type,
       transaction type, budget, bedrooms, bathrooms, and selected market
@@ -851,7 +851,7 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
     - Scheduled sends later should use queue/batched-worker behavior and must
       not fire all clients at once.
     - Do not include private lead/contact data from other agents. Do not include
-      Off Market, Pending, Unapproved, or Rejected listings.
+      Off Market, Under Contract, Unapproved, or Rejected listings.
   - Phase 8 - Test plan:
     - Add schema/RLS tests for alert send history, default market statuses,
       allowed-value constraints, and owner-only visibility.
@@ -1017,7 +1017,7 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
     - Only `approval_status = Approved` listings can be emailed.
     - Alert market statuses are limited to `Coming Soon`, `Active`, and
       `Closed`.
-    - `Pending`, `Off Market`, `Unapproved`, and `Rejected` are excluded from
+    - `Under Contract`, `Off Market`, `Unapproved`, and `Rejected` are excluded from
       alert emails.
     - Emails include up to 5 matching listings.
     - Each listing includes a direct `View Details` link.
@@ -1043,7 +1043,7 @@ Run these after Supabase env vars are configured and `supabase/listings.sql` has
     - Table rows show client, status/source, saved criteria, next follow-up,
       and alert state.
   - `/clients/[id]` now shows alert-eligible matches rather than broad general
-    criteria matches that could include Pending or Off Market listings.
+    criteria matches that could include Under Contract or Off Market listings.
   - Client deletion is implemented:
     - `DELETE /api/clients/[id]`
     - `deleteAgentClient()` in `lib/clients.ts`

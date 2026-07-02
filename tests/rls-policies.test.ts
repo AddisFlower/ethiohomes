@@ -71,7 +71,7 @@ describe("RLS policy migration contract", () => {
 
   it("matches public and role-aware listing visibility rules", () => {
     expect(policies).toMatch(
-      /policy listings_select_public[\s\S]*approval_status = 'Approved'[\s\S]*market_status in \('Coming Soon', 'Active', 'Pending', 'Closed'\)/i
+      /policy listings_select_public[\s\S]*approval_status = 'Approved'[\s\S]*market_status in \('Coming Soon', 'Active', 'Under Contract', 'Closed'\)/i
     );
     expect(policies).toMatch(
       /policy listings_select_authenticated[\s\S]*owner_id = auth\.uid\(\)[\s\S]*approval_status = 'Approved'[\s\S]*market_status = 'Off Market'[\s\S]*ethiomls_private\.is_admin\(\)/i
